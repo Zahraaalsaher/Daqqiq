@@ -1,3 +1,5 @@
+
+
 import streamlit as st
 import pymupdf
 import re
@@ -6,60 +8,123 @@ st.set_page_config(page_title="دقّق | DAQQIQ")
 
 st.title("دقّق | DAQQIQ")
 st.write("مساعد لمراجعة عقود العمل السعودية")
-st.caption("نسخة تجريبية تعليمية - مراجعة أولية وليست استشارة قانونية")
+st.caption("نسخة تجريبية تعليمية وليست استشارة قانونية")
 
 def analyze_contract(text):
+    rules = [
+        {
+            "name": "فترة التجربة",
+            "pattern": r"probation period of\s+(\d+)\s+days",
+            "reference": "المادة 53",
+            "limit": 180
+        },
+        {
+            "name": "ساعات العمل",
+            "pattern": r"(\d+)\s+actual hours per day,\s*(\d+)\s+days per week",
+            "reference": "المواد 98 و99 و100"
+        },
+        {
+            "name": "الإجازة السنوية",
+            "pattern": r"(\d+)\s+days of paid annual leave",
+            "reference": "المادة 109",
+            "limit": 21
+        }
+    ]
+
     results = []
 
-    probation = re.search(
-        r"probation period of\s+(\d+)\s+days",
-        text, re.I
-    )
-    if probation:
-        days = int(probation.group(1))
-        results.append((
-            "فترة التجربة",
-            "تعارض محتمل" if days > 180 else "لم يُرصد تجاوز للمدة",
-            "المادة 53"
-        ))
+    for rule in rules:
+        match = re.search(rule["pattern"], text, re.I)
 
-    hours = re.search(
-        r"(\d+)\s+actual hours per day,\s*(\d+)\s+days per week",
-        text, re.I
-    )
-    if hours:
-        daily = int(hours.group(1))
-        weekly = daily * int(hours.group(2))
-        results.append((
-            "ساعات العمل",
-            "تحتاج مراجعة" if daily > 8 or weekly > 48 else "لم يُرصد تجاوز للحد المعتاد",
-            "المواد 98 و99 و100"
-        ))
+        if not match:
+            continue
 
-    leave = re.search(
-        r"(\d+)\s+days of paid annual leave",
-        text, re.I
-    )
-    if leave:
-        days = int(leave.group(1))
-        results.append((
-            "الإجازة السنوية",
-            "تعارض محتمل" if days < 21 else "تحتاج تحقق من مدة الخدمة",
-            "المادة 109"
-        ))
+        name = rule["name"]
+
+        if name == "فترة التجربة":
+            days = int(match.group(1))
+            issue = days > 180
+            status = "تعارض محتمل" if issue else "لم يُرصد تجاوز للمدة"
+            explanation = (
+                f"مدة التجربة {days} يومًا، وتتجاوز 180 يومًا."
+                if issue else
+                f"مدة التجربة {days} يومًا، ولا تتجاوز 180 يومًا."
+            )
+            recommendation = (
+                "اطلب تعديل مدة التجربة قبل التوقيع."
+                if issue else
+                "تحقق من بقية شروط فترة التجربة."
+            )
+
+        elif name == "ساعات العمل":
+            daily = int(match.group(1))
+            weekly = daily * int(match.group(2))
+            issue = daily > 8 or weekly > 48
+            status = "تحتاج مراجعة" if issue else "لم يُرصد تجاوز للحد المعتاد"
+            explanation = (
+                f"العقد يذكر {daily} ساعات يوميًا و{weekly} ساعة أسبوعيًا. "
+                "قد تنطبق استثناءات نظامية."
+            )
+            recommendation = "تحقق من طبيعة العمل والاستثناءات المطبقة."
+
+        else:
+            days = int(match.group(1))
+            issue = days < 21
+            status = "تعارض محتمل" if issue else "تحتاج تحقق من مدة الخدمة"
+            explanation = (
+                f"الإجازة السنوية {days} يومًا. "
+                "الحد الأدنى المعتاد 21 يومًا، وقد يزيد حسب مدة الخدمة."
+            )
+            recommendation = "تحقق من استحقاق الإجازة السنوية."
+
+        results.append({
+            "name": name,
+            "status": status,
+            "explanation": explanation,
+            "recommendation": recommendation,
+            "reference": rule["reference"]
+        })
 
     if "salary and allowances" in text.lower():
         missing = any(
             phrase in text.lower()
             for phrase in ["determined later", "no amount is stated"]
         )
-        results.append((
-            "الراتب والبدلات",
-            "معلومات ناقصة" if missing else "تحتاج مراجعة يدوية",
-            "المادة 52"
-        ))
+        results.append({
+            "name": "الراتب والبدلات",
+            "status": "معلومات ناقصة" if missing else "تحتاج مراجعة يدوية",
+            "explanation": (
+                "لم يتم تحديد مبلغ الراتب والبدلات بوضوح."
+                if missing else
+                "يجب التحقق من تفاصيل الراتب والبدلات."
+            ),
+            "recommendation": "اطلب توضيح الراتب والبدلات كتابةً.",
+            "reference": "المادة 52"
+        })
 
     return results
+
+def get_original_clause(text, name):
+    keywords = {
+        "فترة التجربة": "probation period",
+        "ساعات العمل": "working hours",
+        "الإجازة السنوية": "annual leave",
+        "الراتب والبدلات": "salary and allowances"
+    }
+
+    keyword = keywords[name]
+    pattern = (
+        r"Clause\s+\d+\s*[-–—:]\s*.*?"
+        r"(?=Clause\s+\d+\s*[-–—:]|EDUCATIONAL TEST ONLY|$)"
+    )
+
+    clauses = re.findall(pattern, text, re.I | re.S)
+
+    for clause in clauses:
+        if keyword in clause.lower():
+            return clause.strip()
+
+    return "تعذر تحديد نص البند الأصلي."
 
 uploaded_file = st.file_uploader(
     "ارفعي عقد العمل بصيغة PDF",
@@ -72,31 +137,34 @@ if uploaded_file is not None:
             stream=uploaded_file.getvalue(),
             filetype="pdf"
         )
-        contract_text = "\n".join(
-            page.get_text() for page in document
-        )
+        text = "\n".join(page.get_text() for page in document)
         document.close()
 
-        if not contract_text.strip():
-            st.warning("تعذر استخراج النص. قد يكون الملف ممسوحًا ضوئيًا.")
+        if not text.strip():
+            st.warning("تعذر استخراج النص من ملف PDF.")
         else:
             st.success("تمت قراءة العقد بنجاح")
-            st.subheader("نتائج مراجعة العقد")
+            results = analyze_contract(text)
 
-            results = analyze_contract(contract_text)
+            st.subheader("تقرير مراجعة العقد")
 
-            if results:
-                for name, status, reference in results:
-                    with st.expander(name, expanded=True):
-                        st.write("الحالة:", status)
-                        st.write("المرجع:", reference)
-            else:
+            if not results:
                 st.warning("لم يتم التعرف على البنود المدعومة.")
 
+            for item in results:
+                with st.expander(item["name"], expanded=True):
+                    st.write("**النص الأصلي:**")
+                    st.write(get_original_clause(text, item["name"]))
+
+                    st.write("**الحالة:**", item["status"])
+                    st.write("**الشرح:**", item["explanation"])
+                    st.write("**التوصية:**", item["recommendation"])
+                    st.write("**المرجع:**", item["reference"])
+
             st.info(
-                "عدم ظهور تنبيه لا يعني أن العقد سليم نظاميًا. "
-                "الفحص الحالي يعتمد على عبارات محددة."
+                "هذا فحص أولي بقواعد محددة. عدم ظهور تنبيه "
+                "لا يعني سلامة العقد، وقد توجد استثناءات نظامية."
             )
 
-    except Exception as error:
-        st.error("تعذر قراءة الملف أو تحليله.")
+    except Exception:
+        st.error("حدث خطأ أثناء قراءة العقد أو تحليله.")
