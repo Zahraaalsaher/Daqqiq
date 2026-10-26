@@ -27,9 +27,9 @@ h1, h2, h3 {
 st.markdown("""
 <div style="background-color:#102A43; padding:35px;
             border-radius:16px; text-align:center; direction:rtl;">
-    <h1 style="color:#E7BE70 !important; font-size:48px; text-align:center; margin:0; padding:10px 0; display:block;">
-        دقّق | DAQQIQ
-    </h1>
+    <div style="color:#E7BE70; font-size:48px; font-weight:bold; text-align:center; padding:10px 0;">
+    دقّق | DAQQIQ
+</div>
     <p style="color:white; font-size:20px;">
         افهم عقد عملك قبل التوقيع
     </p>
