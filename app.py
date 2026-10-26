@@ -183,9 +183,9 @@ if uploaded_file is not None:
             st.markdown("""
 <div style="background-color:#102A43; padding:16px;
             border-radius:10px; text-align:center; margin-top:20px;">
-    <h2 style="color:#E7BE70 !important; margin:0;">
-        تقرير مراجعة العقد
-    </h2>
+    <div style="color:#E7BE70; font-size:28px; font-weight:bold; text-align:center;">
+    تقرير مراجعة العقد
+</div>
 </div>
 """, unsafe_allow_html=True)
 
