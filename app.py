@@ -4,7 +4,7 @@ import streamlit as st
 import pymupdf
 import re
 
-st.set_page_config(page_title="دقّق | DAQQIQ")
+st.set_page_config(page_title="دقّق | DAQQIQ - Beta")
 
 st.title("دقّق | DAQQIQ")
 st.write("مساعد لمراجعة عقود العمل السعودية")
