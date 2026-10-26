@@ -193,7 +193,7 @@ if uploaded_file is not None:
                 st.warning("لم يتم التعرف على البنود المدعومة.")
 
             for item in results:
-                with st.expander(item["name"], expanded=True):
+                with st.expander(item["name"], expanded=False):
                     st.write("**النص الأصلي:**")
                     st.write(get_original_clause(text, item["name"]))
 
