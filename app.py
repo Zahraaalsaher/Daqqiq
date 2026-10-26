@@ -5,9 +5,40 @@ import pymupdf
 import re
 
 st.set_page_config(page_title="دقّق | DAQQIQ - Beta")
+st.markdown("""
+<style>
+.stApp {
+    background-color: #F7F9FC;
+    color: #102A43;
+}
 
-st.title("دقّق | DAQQIQ")
-st.write("مساعد لمراجعة عقود العمل السعودية")
+h1, h2, h3 {
+    color: #102A43 !important;
+}
+
+.stButton > button {
+    background-color: #E7BE70;
+    color: #102A43;
+    border-radius: 10px;
+    border: none;
+}
+</style>
+""", unsafe_allow_html=True)
+st.markdown("""
+<div style="background-color:#102A43; padding:35px;
+            border-radius:16px; text-align:center; direction:rtl;">
+    <h1 style="color:#E7BE70 !important; font-size:48px;">
+        دقّق | DAQQIQ
+    </h1>
+    <p style="color:white; font-size:20px;">
+        افهم عقد عملك قبل التوقيع
+    </p>
+    <p style="color:#DDE6EE; font-size:15px;">
+        مساعد ذكي لمراجعة بنود عقود العمل السعودية
+    </p>
+</div>
+""", unsafe_allow_html=True)
+
 st.caption("نسخة تجريبية تعليمية وليست استشارة قانونية")
 
 def analyze_contract(text):
@@ -126,8 +157,11 @@ def get_original_clause(text, name):
 
     return "تعذر تحديد نص البند الأصلي."
 
+st.markdown("### ابدأ مراجعة عقدك")
+st.write("ارفع عقد العمل بصيغة PDF، وسنساعدك في فهم البنود التي تحتاج إلى مراجعة.")
+
 uploaded_file = st.file_uploader(
-    "ارفعي عقد العمل بصيغة PDF",
+    "اختر ملف عقد العمل (PDF)",
     type=["pdf"]
 )
 
@@ -146,7 +180,14 @@ if uploaded_file is not None:
             st.success("تمت قراءة العقد بنجاح")
             results = analyze_contract(text)
 
-            st.subheader("تقرير مراجعة العقد")
+            st.markdown("""
+<div style="background-color:#102A43; padding:16px;
+            border-radius:10px; text-align:center; margin-top:20px;">
+    <h2 style="color:#E7BE70 !important; margin:0;">
+        تقرير مراجعة العقد
+    </h2>
+</div>
+""", unsafe_allow_html=True)
 
             if not results:
                 st.warning("لم يتم التعرف على البنود المدعومة.")
