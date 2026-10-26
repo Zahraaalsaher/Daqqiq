@@ -179,7 +179,23 @@ if uploaded_file is not None:
         else:
             st.success("تمت قراءة العقد بنجاح")
             results = analyze_contract(text)
+            safe_count = sum(
+                item["status"].startswith("لم يُرصد")
+                for item in results
+            )
 
+            issue_count = sum(
+                item["status"] in ["تعارض محتمل", "معلومات ناقصة"]
+                for item in results
+            )
+
+            review_count = len(results) - safe_count - issue_count
+
+            col1, col2, col3 = st.columns(3)
+
+            col1.metric("لم يُرصد تجاوز", safe_count)
+            col2.metric("تحتاج مراجعة", review_count)
+            col3.metric("تنبيهات محتملة", issue_count)
             st.markdown("""
 <div style="background-color:#102A43; padding:16px;
             border-radius:10px; text-align:center; margin-top:20px;">
