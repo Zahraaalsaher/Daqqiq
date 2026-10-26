@@ -197,7 +197,12 @@ if uploaded_file is not None:
                     st.write("**النص الأصلي:**")
                     st.write(get_original_clause(text, item["name"]))
 
-                    st.write("**الحالة:**", item["status"])
+                    if item["status"].startswith("لم يُرصد"):
+                        st.success("الحالة: " + item["status"])
+                    elif item["status"] in ["تعارض محتمل", "معلومات ناقصة"]:
+                        st.error("الحالة: " + item["status"])
+                    else:
+                        st.warning("الحالة: " + item["status"])
                     st.write("**الشرح:**", item["explanation"])
                     st.write("**التوصية:**", item["recommendation"])
                     st.write("**المرجع:**", item["reference"])
