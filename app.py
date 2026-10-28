@@ -41,37 +41,52 @@ with st.expander(tr("نطاق الخدمة والخصوصية", "Scope and priva
                 "Cited article numbers are pointers for manual review, not live-retrieved or automatically verified legal texts."))
 
 
+def ocr_readability_score(text, language):
+    """Heuristic for choosing OCR script; not a legal accuracy/confidence score."""
+    if not text.strip():
+        return -1
+    arabic = len(re.findall(r"[\u0621-\u064a]", text))
+    latin = len(re.findall(r"[A-Za-z]", text))
+    if language == "eng":
+        words = ["contract", "clause", "probation", "working", "hours", "annual", "leave", "salary", "employee", "employer"]
+        return latin * 1.5 - arabic * 2 + sum(30 for w in words if re.search(r"\b" + w + r"\b", text, re.I))
+    words = ["العقد", "البند", "التجرب", "العمل", "الاجاز", "الراتب", "الموظف", "السنوي", "ساعات"]
+    normalized = normalize_text(text)
+    return arabic * 1.5 - latin * 2 + sum(30 for w in words if w in normalized)
+
+
 def extract_pdf_with_ocr(pdf_bytes):
-    """Extract selectable text, and attempt OCR on pages without usable text."""
+    """Read text PDFs directly; try both Arabic and English OCR for scanned pages."""
     document = pymupdf.open(stream=pdf_bytes, filetype="pdf")
-    pages = []
-    ocr_pages = []
-    failed_pages = []
+    pages, ocr_pages, failed_pages = [], [], []
     try:
         for index, page in enumerate(document):
             raw_text = page.get_text(sort=True).strip()
-            # Do not OCR text PDFs unnecessarily; images/scans often have no text.
             if len(raw_text) >= 40:
                 pages.append(raw_text)
                 continue
-            recognized = ""
-            try:
-                # PyMuPDF OCR calls Tesseract installed on the host system.
-                tp = page.get_textpage_ocr(language="ara", dpi=300, full=True)
-                recognized = page.get_text(textpage=tp, sort=False).strip()
-            except Exception:
+
+            candidates = []
+            for lang in ("eng", "ara"):
                 try:
-                    tp = page.get_textpage_ocr(language="eng", dpi=180, full=True)
-                    recognized = page.get_text(textpage=tp, sort=True).strip()
+                    tp = page.get_textpage_ocr(language=lang, dpi=300, full=True)
+                    # sort=False preserves Arabic reading order better in our test.
+                    recognized = page.get_text(textpage=tp, sort=False).strip()
+                    if recognized:
+                        candidates.append((ocr_readability_score(recognized, lang), recognized, lang))
                 except Exception:
-                    failed_pages.append(index + 1)
-            if recognized and len(recognized) > len(raw_text):
-                pages.append(recognized)
-                ocr_pages.append(index + 1)
+                    pass
+
+            if candidates:
+                _, recognized, chosen_language = max(candidates, key=lambda item: item[0])
+                if len(recognized) > len(raw_text):
+                    pages.append(recognized)
+                    ocr_pages.append(index + 1)
+                else:
+                    pages.append(raw_text)
             else:
                 pages.append(raw_text)
-                if not raw_text and index + 1 not in failed_pages:
-                    failed_pages.append(index + 1)
+                failed_pages.append(index + 1)
     finally:
         document.close()
     return "\n".join(pages), ocr_pages, failed_pages, len(pages)
