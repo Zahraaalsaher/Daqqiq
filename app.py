@@ -1,6 +1,8 @@
 import streamlit as st
 import pymupdf
 import re
+import io
+from datetime import date
 from html import escape
 
 st.set_page_config(page_title="دقّق | DAQQIQ - Beta")
@@ -30,23 +32,31 @@ header_html = """
 """
 st.markdown(header_html.replace("__TITLE__", escape(main_title)).replace("__DESCRIPTION__", escape(main_description)), unsafe_allow_html=True)
 st.caption(tr("نسخة تجريبية تعليمية وليست استشارة قانونية", "Educational beta — not legal advice"))
+with st.expander(tr("نطاق الخدمة والخصوصية", "Scope and privacy")):
+    st.write(tr("دقّق يفحص أربعة موضوعات فقط في عقود العمل السعودية: التجربة، ساعات العمل، الإجازة السنوية، والراتب والبدلات. يعتمد على مطابقة نصوص وقواعد أولية؛ لا يصدر حكمًا قانونيًا ولا يتحقق تلقائيًا من آخر تحديثات الأنظمة.",
+                "DAQQIQ screens four topics in Saudi employment contracts: probation, working hours, annual leave, and salary/allowances. It uses preliminary text-matching rules, not legal judgments or live legal updates."))
+    st.write(tr("يُحلَّل الملف أثناء جلسة التطبيق. لا يتضمن هذا الكود قاعدة بيانات لحفظ العقود ولا يرسل محتوى العقد إلى نموذج ذكاء اصطناعي خارجي. مع ذلك، تتم معالجة الملف على خادم الاستضافة، لذا لا ترفعي عقودًا حقيقية تتضمن بيانات شخصية حساسة إلى هذه النسخة التجريبية.",
+                "The file is processed during the app session. This code has no contract database and does not send contract text to an external AI model. However, the hosting server processes the upload: do not upload real contracts containing sensitive personal data to this beta."))
+    st.write(tr("المراجع المذكورة للتوجيه إلى المراجعة اليدوية فقط، وليست نصوصًا نظامية تم استرجاعها أو التحقق من سريانها آليًا.",
+                "Cited article numbers are pointers for manual review, not live-retrieved or automatically verified legal texts."))
+
 
 def analyze_contract(text):
     rules = [
         {
             "name": "فترة التجربة",
-            "pattern": r"probation period of\s+(\d+)\s+days",
+            "pattern": r"(?:probation period(?: of| is|:)?|فترة التجربة(?: لمدة|:)?|مدة التجربة(?: هي|:)?)[\s\S]{0,24}?(\d+)\s*(?:days?|يوم(?:ًا|ا)?)",
             "reference": "المادة 53",
             "limit": 180
         },
         {
             "name": "ساعات العمل",
-            "pattern": r"(\d+)\s+actual hours per day,\s*(\d+)\s+days per week",
+            "pattern": r"(\d+)\s*(?:actual )?hours per day[,;\s]+(\d+)\s*days per week",
             "reference": "المواد 98 و99 و100"
         },
         {
             "name": "الإجازة السنوية",
-            "pattern": r"(\d+)\s+days of paid annual leave",
+            "pattern": r"(?:annual leave(?: of| is|:)?|إجازة سنوية(?: مدتها|:)?|الإجازة السنوية(?: مدتها|:)?)[\s\S]{0,28}?(\d+)\s*(?:days?|يوم(?:ًا|ا)?)|(\d+)\s*days of paid annual leave",
             "reference": "المادة 109",
             "limit": 21
         }
@@ -89,7 +99,7 @@ def analyze_contract(text):
             recommendation = "تحقق من طبيعة العمل والاستثناءات المطبقة."
 
         else:
-            days = int(match.group(1))
+            days = int(next(g for g in match.groups() if g is not None))
             issue = days < 21
             status = "تعارض محتمل" if issue else "تحتاج تحقق من مدة الخدمة"
             explanation = (
@@ -106,10 +116,10 @@ def analyze_contract(text):
             "reference": rule["reference"]
         })
 
-    if "salary and allowances" in text.lower():
+    if any(k in text.lower() for k in ["salary and allowances", "basic salary", "monthly salary", "الراتب", "الأجر", "البدلات"]):
         missing = any(
             phrase in text.lower()
-            for phrase in ["determined later", "no amount is stated"]
+            for phrase in ["determined later", "no amount is stated", "يحدد لاحقاً", "يحدد لاحقا"]
         )
         results.append({
             "name": "الراتب والبدلات",
@@ -123,6 +133,18 @@ def analyze_contract(text):
             "reference": "المادة 52"
         })
 
+    # Missing matches are not treated as compliant findings.
+    for missing_name, article in [
+        ("فترة التجربة", "المادة 53"),
+        ("ساعات العمل", "المواد 98 و99 و100"),
+        ("الإجازة السنوية", "المادة 109"),
+        ("الراتب والبدلات", "المادة 52"),
+    ]:
+        if not any(item["name"] == missing_name for item in results):
+            results.append({"name": missing_name, "status": "لم يتم التعرف على البند",
+                            "explanation": "لم تتمكن قواعد الاستخراج من تحديد هذا البند من النص المتاح. قد يكون موجودًا بصياغة مختلفة أو في صورة.",
+                            "recommendation": "راجع البند في العقد الأصلي يدويًا، ولا تعتبر غياب التنبيه موافقة نظامية.",
+                            "reference": article})
     return results
 
 def get_original_clause(text, name):
@@ -162,11 +184,15 @@ STATUS_EN = {
     "لم يُرصد تجاوز للحد المعتاد": "No usual limit exceeded",
     "تحتاج تحقق من مدة الخدمة": "Service length needs verification",
     "تم ذكر الراتب والبدلات، وتحتاج مراجعة": "Salary and allowances stated; review needed",
+    "لم يتم التعرف على البند": "Clause not identified",
 }
 
 def english_details(item):
     name = item["name"]
     status = item["status"]
+    if status == "لم يتم التعرف على البند":
+        return ("The extraction rules could not identify this clause in the available text. It may be worded differently or appear in an image.",
+                "Check the original contract manually; absence of an alert does not establish compliance.")
     numbers = re.findall(r"\d+", item["explanation"])
     if name == "فترة التجربة":
         days = numbers[0] if numbers else "?"
@@ -206,12 +232,14 @@ if uploaded_file is not None:
             results = analyze_contract(text)
             safe_count = sum(item["status"].startswith("لم يُرصد") for item in results)
             issue_count = sum(item["status"] in ["تعارض محتمل", "معلومات ناقصة"] for item in results)
-            review_count = len(results) - safe_count - issue_count
+            missing_count = sum(item["status"] == "لم يتم التعرف على البند" for item in results)
+            review_count = len(results) - safe_count - issue_count - missing_count
 
-            col1, col2, col3 = st.columns(3)
+            col1, col2, col3, col4 = st.columns(4)
             col1.metric(tr("لم يُرصد تجاوز", "No limit exceeded"), safe_count)
             col2.metric(tr("تحتاج مراجعة", "Needs review"), review_count)
             col3.metric(tr("تنبيهات محتملة", "Potential alerts"), issue_count)
+            col4.metric(tr("لم يُتعرف عليه", "Not identified"), missing_count)
 
             report_heading = tr("تقرير مراجعة العقد", "Contract review report")
             report_html = """
@@ -246,6 +274,29 @@ if uploaded_file is not None:
                     if is_english:
                         reference = reference.replace("المواد", "Articles").replace("المادة", "Article").replace(" و", " and ")
                     st.write("**" + tr("المرجع:", "Reference:") + "**", reference)
+                    st.caption(tr("للتحقق يدويًا من النص النظامي وتحديثاته: ", "Manually check the legal text and updates: "))
+                    st.markdown("[" + tr("وزارة الموارد البشرية والتنمية الاجتماعية", "Ministry of Human Resources") + "](https://www.hrsd.gov.sa/) · [" + tr("هيئة الخبراء بمجلس الوزراء", "Bureau of Experts") + "](https://laws.boe.gov.sa/)")
+
+            st.markdown("### " + tr("جودة استخراج الملف", "PDF extraction quality"))
+            st.caption(tr("عدد أحرف النص المستخرج: ", "Extracted text characters: ") + str(len(text)))
+            if len(text.strip()) < 200:
+                st.warning(tr("النص المستخرج قصير؛ ربما يحتوي الملف على صور أو جداول لم تُقرأ بدقة. لا تعتمد على النتيجة وحدها.",
+                              "Very little text was extracted; scans or tables may not have been read correctly. Do not rely on this result alone."))
+            st.caption(tr("ملفات PDF المصورة تحتاج OCR؛ هذه النسخة لا تدّعي دعم OCR الكامل.",
+                          "Scanned PDFs require OCR; this version does not claim full OCR support."))
+
+            report_lines = [tr("تقرير دقّق التجريبي", "DAQQIQ beta report"), tr("التاريخ: ", "Date: ") + str(date.today()),
+                            tr("فحص أولي وليس رأيًا قانونيًا", "Preliminary screening, not legal advice"), ""]
+            for item in results:
+                label = NAME_EN.get(item["name"], item["name"]) if is_english else item["name"]
+                status = STATUS_EN.get(item["status"], item["status"]) if is_english else item["status"]
+                expl, rec = english_details(item) if is_english else (item["explanation"], item["recommendation"])
+                report_lines.extend([label, status, expl, rec, item["reference"], ""])
+            report_lines.append(tr("راجع المصادر الرسمية وتحقق من سريان النصوص يدويًا.",
+                                   "Verify current law against official sources manually."))
+            st.download_button(tr("تحميل التقرير النصي", "Download text report"),
+                               data="\n".join(report_lines).encode("utf-8-sig"),
+                               file_name="daqqiq_report.txt", mime="text/plain")
 
             # Ask DAQQIQ: transparent, contract-grounded Q&A for supported clauses only.
             st.markdown("---")
@@ -285,7 +336,7 @@ if uploaded_file is not None:
                 else:
                     topic = topics[0]
                     matching = next((item for item in results if item["name"] == topic), None)
-                    if matching is None:
+                    if matching is None or matching["status"] == "لم يتم التعرف على البند":
                         st.warning(tr(
                             "لم أتعرف على هذا البند في النص المستخرج من عقدك. هذا لا يعني أنه غير موجود أو سليم؛ راجعه يدويًا.",
                             "This clause was not identified in the extracted contract text. It may still be present; please review it manually."
