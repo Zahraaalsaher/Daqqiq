@@ -322,6 +322,12 @@ if uploaded_file is not None:
 
             st.markdown("### " + tr("جودة استخراج الملف", "PDF extraction quality"))
             st.caption(tr("عدد أحرف النص المستخرج: ", "Extracted text characters: ") + str(len(text)))
+            with st.expander(tr("عرض النص المستخرج", "Show extracted text")):
+                st.text_area(
+                    tr("النص الذي قرأه دقّق", "Text read by DAQQIQ"),
+                    value=text,
+                    height=300
+                )
             if len(text.strip()) < 200:
                 st.warning(tr("النص المستخرج قصير؛ ربما يحتوي الملف على صور أو جداول لم تُقرأ بدقة. لا تعتمد على النتيجة وحدها.",
                               "Very little text was extracted; scans or tables may not have been read correctly. Do not rely on this result alone."))
