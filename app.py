@@ -103,6 +103,41 @@ def normalize_text(text):
 TOPICS = ["فترة التجربة", "ساعات العمل", "الإجازة السنوية", "الراتب والبدلات"]
 REFERENCES = {"فترة التجربة": "المادة 53", "ساعات العمل": "المواد 98 و99 و100",
               "الإجازة السنوية": "المادة 109", "الراتب والبدلات": "المادة 52"}
+# Curated, offline reference index: article pointers, NOT live law text or full RAG.
+# The official landing pages are provided for manual checking of amendments.
+SOURCE_INDEX = {
+    "فترة التجربة": {
+        "articles": "53",
+        "ar": "راجعي شروط فترة التجربة ومدتها وطريقة الاتفاق عليها في النظام الساري.",
+        "en": "Check the probation terms, duration and agreement requirements in the current law.",
+    },
+    "ساعات العمل": {
+        "articles": "98–100",
+        "ar": "راجعي ساعات العمل والاستثناءات والراحة بحسب طبيعة العمل والنظام الساري.",
+        "en": "Check working-hour limits, exceptions and rest requirements under current law.",
+    },
+    "الإجازة السنوية": {
+        "articles": "109",
+        "ar": "راجعي الحد الأدنى للإجازة السنوية وتأثير مدة الخدمة في النظام الساري.",
+        "en": "Check annual leave entitlements and the effect of length of service under current law.",
+    },
+    "الراتب والبدلات": {
+        "articles": "52",
+        "ar": "راجعي توثيق الأجر والبدلات وشروط العقد المكتوبة في النظام الساري.",
+        "en": "Check the written wage and allowance terms against current contract requirements.",
+    },
+}
+OFFICIAL_SOURCES = {
+    "HRSD": "https://www.hrsd.gov.sa/",
+    "Bureau of Experts": "https://laws.boe.gov.sa/",
+}
+
+
+def retrieve_reference(topic):
+    """Deterministic retrieval from a four-entry local index, not LLM/RAG."""
+    return SOURCE_INDEX.get(topic)
+
+
 HEADINGS = {
     "فترة التجربة": [r"فترة\s*التجرب", r"التجرب\s*فترة", r"probation", r"trial period"],
     "ساعات العمل": [r"ساعات\s*العمل", r"working hours", r"hours per day", r"ساعات\s*يومي"],
@@ -167,11 +202,25 @@ def analyze_contract(text, scanned=False):
 
 
 def get_original_clause(text, name):
-    """Return a short, verbatim excerpt only when its heading can be located."""
-    normalized_lines = [(line, normalize_text(line)) for line in text.splitlines()]
-    for i, (_, norm) in enumerate(normalized_lines):
+    """Extract a short original-text snippet, stopping at the next clause heading."""
+    lines = text.splitlines()
+    for i, line in enumerate(lines):
+        norm = normalize_text(line)
         if any(re.search(pattern, norm, re.I) for pattern in HEADINGS[name]):
-            return "\n".join(line for line, _ in normalized_lines[i:i + 4]).strip()
+            # OCR sometimes merges the next heading onto the same line.
+            snippet = " ".join(lines[i:i + 3]).strip()
+            next_headings = [
+                r"Clause\s+\d+\s*[-–—:]",
+                r"البند\s+(?:الاول|الثاني|الثالث|الرابع|الخامس|الاولى|الثانى)\s*[:：-]?",
+            ]
+            # Remove any next heading, but preserve the first heading at the start.
+            for pattern in next_headings:
+                matches = list(re.finditer(pattern, normalize_text(snippet), re.I))
+                for match in matches:
+                    if match.start() > 2:
+                        snippet = snippet[:match.start()].rstrip()
+                        break
+            return snippet[:700]
     return "تعذر تحديد نص البند الأصلي."
 
 
@@ -222,6 +271,17 @@ def english_details(item):
             "Ask for salary and allowances to be clarified in writing." if missing else
             "Review the amounts and confirm the parties' written agreement.")
 
+with st.expander(tr("المصادر النظامية ونطاق الاسترجاع", "Legal sources and retrieval scope")):
+    st.write(tr(
+        "هذه مكتبة مرجعية محلية صغيرة تربط كل بند برقم المادة وملاحظة إرشادية. لا تسترجع نص النظام مباشرة، ولا تتابع تحديثاته، ولا تستخدم نموذجًا توليديًا؛ لذلك ليست RAG كاملة.",
+        "This is a small offline reference index linking each clause to article numbers and review notes. It does not fetch live law, track amendments, or use a generative model; it is not full RAG."
+    ))
+    for topic, source in SOURCE_INDEX.items():
+        label = NAME_EN.get(topic, topic) if is_english else topic
+        st.write("**" + label + " — " + tr("المادة/المواد: ", "Article(s): ") + source["articles"] + "**")
+        st.caption(source["en"] if is_english else source["ar"])
+    st.markdown("[HRSD](https://www.hrsd.gov.sa/) · [Bureau of Experts](https://laws.boe.gov.sa/)")
+
 st.markdown("### " + tr("ابدأ مراجعة عقدك", "Start reviewing your contract"))
 st.write(tr("ارفع عقد العمل بصيغة PDF، وسنساعدك في فهم البنود التي تحتاج إلى مراجعة.",
             "Upload an employment contract as a PDF to review supported clauses."))
@@ -245,6 +305,7 @@ if uploaded_file is not None:
                           "Could not extract text from this PDF. It may be a scanned document."))
         else:
             st.success(tr("اكتملت محاولة استخراج النص", "Text extraction attempt completed"))
+            # Conservative: if any page used OCR, avoid numeric compliance claims.
             results = analyze_contract(text, scanned=bool(ocr_pages))
             if ocr_pages:
                 st.warning(tr(
@@ -300,6 +361,9 @@ if uploaded_file is not None:
                     st.caption(tr("للتحقق يدويًا من النص النظامي وتحديثاته: ", "Manually check the legal text and updates: "))
                     st.markdown("[" + tr("وزارة الموارد البشرية والتنمية الاجتماعية", "Ministry of Human Resources") + "](https://www.hrsd.gov.sa/) · [" + tr("هيئة الخبراء بمجلس الوزراء", "Bureau of Experts") + "](https://laws.boe.gov.sa/)")
 
+            st.caption(tr("التصنيف يصف ما رصدته قواعد الفحص فقط؛ لا يثبت صحة العقد أو مخالفته.",
+                          "Statuses describe rule-based findings only; they do not establish legal compliance or violation."))
+
             st.markdown("### " + tr("جودة استخراج الملف", "PDF extraction quality"))
             st.caption(tr("عدد أحرف النص المستخرج: ", "Extracted text characters: ") + str(len(text)))
             with st.expander(tr("عرض النص المستخرج", "Show extracted text")):
@@ -321,6 +385,9 @@ if uploaded_file is not None:
                 status = STATUS_EN.get(item["status"], item["status"]) if is_english else item["status"]
                 expl, rec = english_details(item) if is_english else (item["explanation"], item["recommendation"])
                 report_lines.extend([label, status, expl, rec, item["reference"], ""])
+            if ocr_pages:
+                report_lines.extend([tr("تحذير: استخدم OCR؛ النتائج والأرقام غير مؤكدة وتحتاج مقارنة بالصور الأصلية.",
+                                        "Warning: OCR was used; findings and numbers are unverified and must be compared with the original images."), ""])
             report_lines.append(tr("راجع المصادر الرسمية وتحقق من سريان النصوص يدويًا.",
                                    "Verify current law against official sources manually."))
             st.download_button(tr("تحميل التقرير النصي", "Download text report"),
@@ -382,6 +449,12 @@ if uploaded_file is not None:
                         reference = matching["reference"]
                         if is_english:
                             reference = reference.replace("المواد", "Articles").replace("المادة", "Article").replace(" و", " and ")
+                        source = retrieve_reference(topic)
+                        if source:
+                            st.write("**" + tr("من المكتبة المرجعية المحلية:", "From the local reference index:") + "**")
+                            st.write(source["en"] if is_english else source["ar"])
+                            st.caption(tr("رقم المادة للمراجعة: ", "Article pointer: ") + source["articles"])
+                            st.markdown("[HRSD](https://www.hrsd.gov.sa/) · [Bureau of Experts](https://laws.boe.gov.sa/)")
                         st.caption(tr("مرجع مذكور للمراجعة (لم يتم التحقق من سريانه آليًا): ",
                                       "Reference for manual verification (not automatically checked for currency): ") + reference)
                         st.caption(tr(
