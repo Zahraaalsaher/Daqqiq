@@ -5,6 +5,12 @@ import pymupdf
 import re
 
 st.set_page_config(page_title="دقّق | DAQQIQ - Beta")
+
+language = st.radio(
+    "Language",
+    ["Arabic", "English"],
+    horizontal=True
+)
 st.markdown("""
 <style>
 .stApp {
