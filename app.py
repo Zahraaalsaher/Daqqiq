@@ -57,7 +57,8 @@ def extract_pdf_with_ocr(pdf_bytes):
             recognized = ""
             try:
                 # PyMuPDF OCR calls Tesseract installed on the host system.
-                tp = page.get_textpage_ocr(language="ara+eng", dpi=300, full=True)
+               tp = page.get_textpage_ocr(language="ara", dpi=300, full=True) 
+
                 recognized = page.get_text(textpage=tp, sort=False).strip()
             except Exception:
                 try:
