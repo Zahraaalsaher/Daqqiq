@@ -41,6 +41,42 @@ with st.expander(tr("نطاق الخدمة والخصوصية", "Scope and priva
                 "Cited article numbers are pointers for manual review, not live-retrieved or automatically verified legal texts."))
 
 
+def extract_pdf_with_ocr(pdf_bytes):
+    """Extract selectable text, and attempt OCR on pages without usable text."""
+    document = pymupdf.open(stream=pdf_bytes, filetype="pdf")
+    pages = []
+    ocr_pages = []
+    failed_pages = []
+    try:
+        for index, page in enumerate(document):
+            raw_text = page.get_text(sort=True).strip()
+            # Do not OCR text PDFs unnecessarily; images/scans often have no text.
+            if len(raw_text) >= 40:
+                pages.append(raw_text)
+                continue
+            recognized = ""
+            try:
+                # PyMuPDF OCR calls Tesseract installed on the host system.
+                tp = page.get_textpage_ocr(language="ara+eng", dpi=180, full=True)
+                recognized = page.get_text(textpage=tp, sort=True).strip()
+            except Exception:
+                try:
+                    tp = page.get_textpage_ocr(language="eng", dpi=180, full=True)
+                    recognized = page.get_text(textpage=tp, sort=True).strip()
+                except Exception:
+                    failed_pages.append(index + 1)
+            if recognized and len(recognized) > len(raw_text):
+                pages.append(recognized)
+                ocr_pages.append(index + 1)
+            else:
+                pages.append(raw_text)
+                if not raw_text and index + 1 not in failed_pages:
+                    failed_pages.append(index + 1)
+    finally:
+        document.close()
+    return "\n".join(pages), ocr_pages, failed_pages, len(pages)
+
+
 def analyze_contract(text):
     rules = [
         {
@@ -220,9 +256,16 @@ uploaded_file = st.file_uploader(tr("اختر ملف عقد العمل (PDF)", "
 
 if uploaded_file is not None:
     try:
-        document = pymupdf.open(stream=uploaded_file.getvalue(), filetype="pdf")
-        text = "\n".join(page.get_text() for page in document)
-        document.close()
+        with st.spinner(tr("جاري استخراج النص ومحاولة قراءة الصفحات المصورة...", "Extracting text and checking scanned pages with OCR...")):
+            text, ocr_pages, failed_pages, total_pages = extract_pdf_with_ocr(uploaded_file.getvalue())
+        st.caption(tr(f"صفحات الملف: {total_pages} | صفحات OCR: {len(ocr_pages)}",
+                      f"PDF pages: {total_pages} | OCR pages: {len(ocr_pages)}"))
+        if ocr_pages:
+            st.info(tr("تم استخدام OCR لقراءة الصفحات: " + ", ".join(map(str, ocr_pages)) + ". راجعي النص المستخرج لأن OCR قد يخطئ في الأرقام والجداول.",
+                       "OCR was used on pages: " + ", ".join(map(str, ocr_pages)) + ". Verify extracted numbers and tables; OCR can make mistakes."))
+        if failed_pages:
+            st.warning(tr("تعذرت قراءة بعض الصفحات أو لم يظهر فيها نص كافٍ: " + ", ".join(map(str, failed_pages)) + ". لا تعتمدي على نتائج هذه الصفحات دون مراجعة.",
+                          "Some pages could not be read reliably: " + ", ".join(map(str, failed_pages)) + ". Review those pages manually."))
 
         if not text.strip():
             st.warning(tr("تعذر استخراج النص من ملف PDF. قد يكون الملف مصورًا.",
@@ -363,4 +406,5 @@ if uploaded_file is not None:
             st.info(tr("هذا فحص أولي بقواعد محددة. عدم ظهور تنبيه لا يعني سلامة العقد، وقد توجد استثناءات نظامية.",
                        "This is a preliminary rule-based check. No alert does not mean the contract is legally compliant; exceptions may apply."))
     except Exception:
-        st.error(tr("حدث خطأ أثناء قراءة العقد أو تحليله.", "An error occurred while reading or analyzing the contract."))
+        st.error(tr("حدث خطأ أثناء قراءة العقد أو تحليله. تأكدي من أن الملف PDF صالح وأن OCR متاح على الخادم.",
+                    "Could not process the PDF. Check that the PDF is valid and OCR is available on the server."))
