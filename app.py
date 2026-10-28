@@ -1,51 +1,35 @@
-
-
 import streamlit as st
 import pymupdf
 import re
+from html import escape
 
 st.set_page_config(page_title="دقّق | DAQQIQ - Beta")
 
-language = st.radio(
-    "Language",
-    ["Arabic", "English"],
-    horizontal=True
-)
+language = st.radio("Language / اللغة", ["العربية", "English"], horizontal=True)
+is_english = language == "English"
+
+def tr(ar, en):
+    return en if is_english else ar
+
 st.markdown("""
 <style>
-.stApp {
-    background-color: #F7F9FC;
-    color: #102A43;
-}
-
-h1, h2, h3 {
-    color: #102A43 !important;
-}
-
-.stButton > button {
-    background-color: #E7BE70;
-    color: #102A43;
-    border-radius: 10px;
-    border: none;
-}
+.stApp {background-color: #F7F9FC; color: #102A43;}
+h1, h2, h3 {color: #102A43 !important;}
+.stButton > button {background-color: #E7BE70; color: #102A43; border-radius: 10px; border: none;}
 </style>
 """, unsafe_allow_html=True)
-st.markdown("""
-<div style="background-color:#102A43; padding:35px;
-            border-radius:16px; text-align:center; direction:rtl;">
-    <div style="color:#E7BE70; font-size:48px; font-weight:bold; text-align:center; padding:10px 0;">
-    دقّق | DAQQIQ
-</div>
-    <p style="color:white; font-size:20px;">
-        افهم عقد عملك قبل التوقيع
-    </p>
-    <p style="color:#DDE6EE; font-size:15px;">
-        مساعد ذكي لمراجعة بنود عقود العمل السعودية
-    </p>
-</div>
-""", unsafe_allow_html=True)
 
-st.caption("نسخة تجريبية تعليمية وليست استشارة قانونية")
+main_title = tr("افهم عقد عملك قبل التوقيع", "Understand your employment contract before signing")
+main_description = tr("مساعد لمراجعة بنود عقود العمل السعودية", "An assistant for reviewing Saudi employment contract clauses")
+header_html = """
+<div style="background-color:#102A43; padding:35px; border-radius:16px; text-align:center;">
+  <div style="color:#E7BE70; font-size:48px; font-weight:bold; padding:10px 0;">دقّق | DAQQIQ</div>
+  <p style="color:white; font-size:20px;">__TITLE__</p>
+  <p style="color:#DDE6EE; font-size:15px;">__DESCRIPTION__</p>
+</div>
+"""
+st.markdown(header_html.replace("__TITLE__", escape(main_title)).replace("__DESCRIPTION__", escape(main_description)), unsafe_allow_html=True)
+st.caption(tr("نسخة تجريبية تعليمية وليست استشارة قانونية", "Educational beta — not legal advice"))
 
 def analyze_contract(text):
     rules = [
@@ -163,76 +147,107 @@ def get_original_clause(text, name):
 
     return "تعذر تحديد نص البند الأصلي."
 
-st.markdown("### ابدأ مراجعة عقدك")
-st.write("ارفع عقد العمل بصيغة PDF، وسنساعدك في فهم البنود التي تحتاج إلى مراجعة.")
 
-uploaded_file = st.file_uploader(
-    "اختر ملف عقد العمل (PDF)",
-    type=["pdf"]
-)
+NAME_EN = {
+    "فترة التجربة": "Probation period",
+    "ساعات العمل": "Working hours",
+    "الإجازة السنوية": "Annual leave",
+    "الراتب والبدلات": "Salary and allowances",
+}
+STATUS_EN = {
+    "تعارض محتمل": "Potential conflict",
+    "معلومات ناقصة": "Missing information",
+    "تحتاج مراجعة": "Needs review",
+    "لم يُرصد تجاوز للمدة": "No duration limit exceeded",
+    "لم يُرصد تجاوز للحد المعتاد": "No usual limit exceeded",
+    "تحتاج تحقق من مدة الخدمة": "Service length needs verification",
+    "تم ذكر الراتب والبدلات، وتحتاج مراجعة": "Salary and allowances stated; review needed",
+}
+
+def english_details(item):
+    name = item["name"]
+    status = item["status"]
+    numbers = re.findall(r"\d+", item["explanation"])
+    if name == "فترة التجربة":
+        days = numbers[0] if numbers else "?"
+        issue = status == "تعارض محتمل"
+        return (f"The probation period is {days} days. " + ("This exceeds 180 days." if issue else "This does not exceed 180 days."),
+                "Request a revision of the probation period before signing." if issue else "Check the remaining probation terms.")
+    if name == "ساعات العمل":
+        daily, weekly = (numbers + ["?", "?"])[:2]
+        return (f"The contract states {daily} hours per day and {weekly} hours per week. Legal exceptions may apply.",
+                "Check the type of work and any applicable exceptions.")
+    if name == "الإجازة السنوية":
+        days = numbers[0] if numbers else "?"
+        return (f"Annual leave is {days} days. The usual minimum is 21 days and may increase with length of service.",
+                "Verify the annual leave entitlement based on length of service.")
+    missing = status == "معلومات ناقصة"
+    return (("The salary and allowances amounts are not clearly specified." if missing else
+             "Salary and allowances are mentioned, but their completeness and accuracy need review."),
+            "Ask for salary and allowances to be clarified in writing." if missing else
+            "Review the amounts and confirm the parties' written agreement.")
+
+st.markdown("### " + tr("ابدأ مراجعة عقدك", "Start reviewing your contract"))
+st.write(tr("ارفع عقد العمل بصيغة PDF، وسنساعدك في فهم البنود التي تحتاج إلى مراجعة.",
+            "Upload an employment contract as a PDF to review supported clauses."))
+uploaded_file = st.file_uploader(tr("اختر ملف عقد العمل (PDF)", "Choose an employment contract (PDF)"), type=["pdf"])
 
 if uploaded_file is not None:
     try:
-        document = pymupdf.open(
-            stream=uploaded_file.getvalue(),
-            filetype="pdf"
-        )
+        document = pymupdf.open(stream=uploaded_file.getvalue(), filetype="pdf")
         text = "\n".join(page.get_text() for page in document)
         document.close()
 
         if not text.strip():
-            st.warning("تعذر استخراج النص من ملف PDF.")
+            st.warning(tr("تعذر استخراج النص من ملف PDF. قد يكون الملف مصورًا.",
+                          "Could not extract text from this PDF. It may be a scanned document."))
         else:
-            st.success("تمت قراءة العقد بنجاح")
+            st.success(tr("تمت قراءة العقد بنجاح", "Contract text extracted successfully"))
             results = analyze_contract(text)
-            safe_count = sum(
-                item["status"].startswith("لم يُرصد")
-                for item in results
-            )
-
-            issue_count = sum(
-                item["status"] in ["تعارض محتمل", "معلومات ناقصة"]
-                for item in results
-            )
-
+            safe_count = sum(item["status"].startswith("لم يُرصد") for item in results)
+            issue_count = sum(item["status"] in ["تعارض محتمل", "معلومات ناقصة"] for item in results)
             review_count = len(results) - safe_count - issue_count
 
             col1, col2, col3 = st.columns(3)
+            col1.metric(tr("لم يُرصد تجاوز", "No limit exceeded"), safe_count)
+            col2.metric(tr("تحتاج مراجعة", "Needs review"), review_count)
+            col3.metric(tr("تنبيهات محتملة", "Potential alerts"), issue_count)
 
-            col1.metric("لم يُرصد تجاوز", safe_count)
-            col2.metric("تحتاج مراجعة", review_count)
-            col3.metric("تنبيهات محتملة", issue_count)
-            st.markdown("""
-<div style="background-color:#102A43; padding:16px;
-            border-radius:10px; text-align:center; margin-top:20px;">
-    <div style="color:#E7BE70; font-size:28px; font-weight:bold; text-align:center;">
-    تقرير مراجعة العقد
+            report_heading = tr("تقرير مراجعة العقد", "Contract review report")
+            report_html = """
+<div style="background-color:#102A43; padding:16px; border-radius:10px; text-align:center; margin-top:20px;">
+  <div style="color:#E7BE70; font-size:28px; font-weight:bold;">__REPORT__</div>
 </div>
-</div>
-""", unsafe_allow_html=True)
+"""
+            st.markdown(report_html.replace("__REPORT__", escape(report_heading)), unsafe_allow_html=True)
 
             if not results:
-                st.warning("لم يتم التعرف على البنود المدعومة.")
+                st.warning(tr("لم يتم التعرف على البنود المدعومة.", "No supported clauses were identified."))
 
             for item in results:
-                with st.expander(item["name"], expanded=False):
-                    st.write("**النص الأصلي:**")
-                    st.write(get_original_clause(text, item["name"]))
-
+                name = NAME_EN.get(item["name"], item["name"]) if is_english else item["name"]
+                status = STATUS_EN.get(item["status"], item["status"]) if is_english else item["status"]
+                explanation, recommendation = english_details(item) if is_english else (item["explanation"], item["recommendation"])
+                with st.expander(name, expanded=False):
+                    st.write("**" + tr("النص الأصلي:", "Original clause:") + "**")
+                    clause = get_original_clause(text, item["name"])
+                    if is_english and clause == "تعذر تحديد نص البند الأصلي.":
+                        clause = "Original clause could not be identified."
+                    st.write(clause)
                     if item["status"].startswith("لم يُرصد"):
-                        st.success("الحالة: " + item["status"])
+                        st.success(tr("الحالة: ", "Status: ") + status)
                     elif item["status"] in ["تعارض محتمل", "معلومات ناقصة"]:
-                        st.error("الحالة: " + item["status"])
+                        st.error(tr("الحالة: ", "Status: ") + status)
                     else:
-                        st.warning("الحالة: " + item["status"])
-                    st.write("**الشرح:**", item["explanation"])
-                    st.write("**التوصية:**", item["recommendation"])
-                    st.write("**المرجع:**", item["reference"])
+                        st.warning(tr("الحالة: ", "Status: ") + status)
+                    st.write("**" + tr("الشرح:", "Explanation:") + "**", explanation)
+                    st.write("**" + tr("التوصية:", "Recommendation:") + "**", recommendation)
+                    reference = item["reference"]
+                    if is_english:
+                        reference = reference.replace("المواد", "Articles").replace("المادة", "Article").replace(" و", " and ")
+                    st.write("**" + tr("المرجع:", "Reference:") + "**", reference)
 
-            st.info(
-                "هذا فحص أولي بقواعد محددة. عدم ظهور تنبيه "
-                "لا يعني سلامة العقد، وقد توجد استثناءات نظامية."
-            )
-
+            st.info(tr("هذا فحص أولي بقواعد محددة. عدم ظهور تنبيه لا يعني سلامة العقد، وقد توجد استثناءات نظامية.",
+                       "This is a preliminary rule-based check. No alert does not mean the contract is legally compliant; exceptions may apply."))
     except Exception:
-        st.error("حدث خطأ أثناء قراءة العقد أو تحليله.")
+        st.error(tr("حدث خطأ أثناء قراءة العقد أو تحليله.", "An error occurred while reading or analyzing the contract."))
