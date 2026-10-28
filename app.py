@@ -77,132 +77,86 @@ def extract_pdf_with_ocr(pdf_bytes):
     return "\n".join(pages), ocr_pages, failed_pages, len(pages)
 
 
-def analyze_contract(text):
-    rules = [
-        {
-            "name": "فترة التجربة",
-            "pattern": r"(?:probation period(?: of| is|:)?|فترة التجربة(?: لمدة|:)?|مدة التجربة(?: هي|:)?)[\s\S]{0,24}?(\d+)\s*(?:days?|يوم(?:ًا|ا)?)",
-            "reference": "المادة 53",
-            "limit": 180
-        },
-        {
-            "name": "ساعات العمل",
-            "pattern": r"(\d+)\s*(?:actual )?hours per day[,;\s]+(\d+)\s*days per week",
-            "reference": "المواد 98 و99 و100"
-        },
-        {
-            "name": "الإجازة السنوية",
-            "pattern": r"(?:annual leave(?: of| is|:)?|إجازة سنوية(?: مدتها|:)?|الإجازة السنوية(?: مدتها|:)?)[\s\S]{0,28}?(\d+)\s*(?:days?|يوم(?:ًا|ا)?)|(\d+)\s*days of paid annual leave",
-            "reference": "المادة 109",
-            "limit": 21
-        }
-    ]
+def normalize_text(text):
+    """Normalize Arabic digits and common orthographic variants for matching only."""
+    digits = str.maketrans("٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹", "01234567890123456789")
+    text = text.translate(digits)
+    text = re.sub(r"[\u064b-\u065f\u0670ـ]", "", text)
+    return text.replace("أ", "ا").replace("إ", "ا").replace("آ", "ا").replace("ى", "ي")
 
+
+TOPICS = ["فترة التجربة", "ساعات العمل", "الإجازة السنوية", "الراتب والبدلات"]
+REFERENCES = {"فترة التجربة": "المادة 53", "ساعات العمل": "المواد 98 و99 و100",
+              "الإجازة السنوية": "المادة 109", "الراتب والبدلات": "المادة 52"}
+HEADINGS = {
+    "فترة التجربة": [r"فترة\s*التجرب", r"التجرب\s*فترة", r"probation", r"trial period"],
+    "ساعات العمل": [r"ساعات\s*العمل", r"working hours", r"hours per day", r"ساعات\s*يومي"],
+    "الإجازة السنوية": [r"الاجازة\s*السنوي", r"اجازة\s*سنوي", r"annual leave"],
+    "الراتب والبدلات": [r"الراتب", r"البدلات", r"salary", r"allowances", r"wages"],
+}
+
+
+def analyze_contract(text, scanned=False):
+    """Conservative four-topic screening; never infer legal compliance from OCR."""
+    normalized = normalize_text(text)
     results = []
+    for name in TOPICS:
+        found = any(re.search(pattern, normalized, re.I) for pattern in HEADINGS[name])
+        status = "لم يتم التعرف على البند"
+        explanation = "لم تتمكن قواعد الاستخراج من تحديد هذا البند من النص المتاح."
+        recommendation = "راجعي العقد الأصلي يدويًا. عدم التعرف لا يعني غياب البند."
+        if found:
+            status = "تم العثور على البند ويحتاج مراجعة"
+            explanation = "تم التعرف على موضوع البند، لكن لم يتم التحقق من تفاصيله أو أرقامه."
+            recommendation = "راجعي النص الأصلي والأرقام قبل اتخاذ أي قرار."
 
-    for rule in rules:
-        match = re.search(rule["pattern"], text, re.I)
+        if found and not scanned:
+            # Only accept numbers close to recognizable, unambiguous phrases in selectable text.
+            if name == "فترة التجربة":
+                m = re.search(r"(?:probation period(?: of| is|:)?|فترة التجرب[هة]\s*(?:لمدة|مدتها)?|مدة التجرب[هة])\s*(?:of|is|:)?\s*(\d{1,3})\s*(?:days?|يوم)", normalized, re.I)
+                if m:
+                    days = int(m.group(1))
+                    status = "تعارض محتمل" if days > 180 else "لم يُرصد تجاوز للمدة"
+                    explanation = f"مدة التجربة المذكورة {days} يومًا. " + ("تتجاوز 180 يومًا." if days > 180 else "لا تتجاوز 180 يومًا؛ راجعي بقية الشروط.")
+                    recommendation = "تحققي من تطبيق النص النظامي الحالي والاستثناءات على العقد."
+            elif name == "ساعات العمل":
+                m = re.search(r"(\d{1,2})\s*(?:actual )?hours per day[,;\s]+(\d{1,2})\s*days per week", normalized, re.I)
+                if m:
+                    daily, days_per_week = map(int, m.groups())
+                    if 0 < daily <= 24 and 0 < days_per_week <= 7:
+                        weekly = daily * days_per_week
+                        status = "تحتاج مراجعة" if daily > 8 or weekly > 48 else "لم يُرصد تجاوز للحد المعتاد"
+                        explanation = f"العقد يذكر {daily} ساعات يوميًا و{weekly} ساعة أسبوعيًا؛ قد تنطبق استثناءات."
+                        recommendation = "تحققي من نوع العمل والاستثناءات والأنظمة السارية."
+            elif name == "الإجازة السنوية":
+                m = re.search(r"(?:annual leave(?: of| is|:)?|اجازة سنوية(?: مدتها|:)?|الاجازة السنوية(?: مدتها|:)?)[\s\S]{0,24}?(\d{1,3})\s*(?:days?|يوم)|(\d{1,3})\s*days of paid annual leave", normalized, re.I)
+                if m:
+                    days = int(next(v for v in m.groups() if v is not None))
+                    status = "تعارض محتمل" if days < 21 else "تحتاج تحقق من مدة الخدمة"
+                    explanation = f"الإجازة المذكورة {days} يومًا؛ الحد الأدنى المعتاد 21 يومًا وقد يختلف الاستحقاق حسب مدة الخدمة."
+                    recommendation = "راجعي الاستحقاق وفق مدة الخدمة والنظام الساري."
+            elif name == "الراتب والبدلات":
+                if re.search(r"determined later|no amount is stated|يحدد لاحقا", normalized, re.I):
+                    status = "معلومات ناقصة"
+                    explanation = "وردت صياغة تفيد أن مبلغ الراتب لم يُحدد بوضوح."
+                    recommendation = "اطلبي تحديد المبلغ والبدلات كتابةً."
+                else:
+                    explanation = "ورد ذكر الراتب أو البدلات؛ يلزم التحقق من المبالغ والتفاصيل في الأصل."
+        elif found and scanned:
+            explanation = "رُصد عنوان أو كلمات من هذا البند في صفحة مصورة، لكن أرقام OCR غير موثوقة ولا يجوز استخدامها للحكم على العقد."
+            recommendation = "قارني الأرقام والنص مع صورة العقد الأصلي يدويًا."
 
-        if not match:
-            continue
-
-        name = rule["name"]
-
-        if name == "فترة التجربة":
-            days = int(match.group(1))
-            issue = days > 180
-            status = "تعارض محتمل" if issue else "لم يُرصد تجاوز للمدة"
-            explanation = (
-                f"مدة التجربة {days} يومًا، وتتجاوز 180 يومًا."
-                if issue else
-                f"مدة التجربة {days} يومًا، ولا تتجاوز 180 يومًا."
-            )
-            recommendation = (
-                "اطلب تعديل مدة التجربة قبل التوقيع."
-                if issue else
-                "تحقق من بقية شروط فترة التجربة."
-            )
-
-        elif name == "ساعات العمل":
-            daily = int(match.group(1))
-            weekly = daily * int(match.group(2))
-            issue = daily > 8 or weekly > 48
-            status = "تحتاج مراجعة" if issue else "لم يُرصد تجاوز للحد المعتاد"
-            explanation = (
-                f"العقد يذكر {daily} ساعات يوميًا و{weekly} ساعة أسبوعيًا. "
-                "قد تنطبق استثناءات نظامية."
-            )
-            recommendation = "تحقق من طبيعة العمل والاستثناءات المطبقة."
-
-        else:
-            days = int(next(g for g in match.groups() if g is not None))
-            issue = days < 21
-            status = "تعارض محتمل" if issue else "تحتاج تحقق من مدة الخدمة"
-            explanation = (
-                f"الإجازة السنوية {days} يومًا. "
-                "الحد الأدنى المعتاد 21 يومًا، وقد يزيد حسب مدة الخدمة."
-            )
-            recommendation = "تحقق من استحقاق الإجازة السنوية."
-
-        results.append({
-            "name": name,
-            "status": status,
-            "explanation": explanation,
-            "recommendation": recommendation,
-            "reference": rule["reference"]
-        })
-
-    if any(k in text.lower() for k in ["salary and allowances", "basic salary", "monthly salary", "الراتب", "الأجر", "البدلات"]):
-        missing = any(
-            phrase in text.lower()
-            for phrase in ["determined later", "no amount is stated", "يحدد لاحقاً", "يحدد لاحقا"]
-        )
-        results.append({
-            "name": "الراتب والبدلات",
-            "status": "معلومات ناقصة" if missing else "تم ذكر الراتب والبدلات، وتحتاج مراجعة",
-            "explanation": (
-                "لم يتم تحديد مبلغ الراتب والبدلات بوضوح."
-                if missing else
-                "وردت معلومات عن الراتب والبدلات في العقد، لكن يلزم التأكد من اكتمالها وصحتها."
-            ),
-            "recommendation": "اطلب توضيح الراتب والبدلات كتابةً." if missing else "راجع المبالغ المذكورة وتأكد من اتفاق الطرفين عليها كتابةً.",
-            "reference": "المادة 52"
-        })
-
-    # Missing matches are not treated as compliant findings.
-    for missing_name, article in [
-        ("فترة التجربة", "المادة 53"),
-        ("ساعات العمل", "المواد 98 و99 و100"),
-        ("الإجازة السنوية", "المادة 109"),
-        ("الراتب والبدلات", "المادة 52"),
-    ]:
-        if not any(item["name"] == missing_name for item in results):
-            results.append({"name": missing_name, "status": "لم يتم التعرف على البند",
-                            "explanation": "لم تتمكن قواعد الاستخراج من تحديد هذا البند من النص المتاح. قد يكون موجودًا بصياغة مختلفة أو في صورة.",
-                            "recommendation": "راجع البند في العقد الأصلي يدويًا، ولا تعتبر غياب التنبيه موافقة نظامية.",
-                            "reference": article})
+        results.append({"name": name, "status": status, "explanation": explanation,
+                        "recommendation": recommendation, "reference": REFERENCES[name]})
     return results
 
+
 def get_original_clause(text, name):
-    keywords = {
-        "فترة التجربة": "probation period",
-        "ساعات العمل": "working hours",
-        "الإجازة السنوية": "annual leave",
-        "الراتب والبدلات": "salary and allowances"
-    }
-
-    keyword = keywords[name]
-    pattern = (
-        r"Clause\s+\d+\s*[-–—:]\s*.*?"
-        r"(?=Clause\s+\d+\s*[-–—:]|EDUCATIONAL TEST ONLY|$)"
-    )
-
-    clauses = re.findall(pattern, text, re.I | re.S)
-
-    for clause in clauses:
-        if keyword in clause.lower():
-            return clause.strip()
-
+    """Return a short, verbatim excerpt only when its heading can be located."""
+    normalized_lines = [(line, normalize_text(line)) for line in text.splitlines()]
+    for i, (_, norm) in enumerate(normalized_lines):
+        if any(re.search(pattern, norm, re.I) for pattern in HEADINGS[name]):
+            return "\n".join(line for line, _ in normalized_lines[i:i + 4]).strip()
     return "تعذر تحديد نص البند الأصلي."
 
 
@@ -220,12 +174,16 @@ STATUS_EN = {
     "لم يُرصد تجاوز للحد المعتاد": "No usual limit exceeded",
     "تحتاج تحقق من مدة الخدمة": "Service length needs verification",
     "تم ذكر الراتب والبدلات، وتحتاج مراجعة": "Salary and allowances stated; review needed",
+    "تم العثور على البند ويحتاج مراجعة": "Clause found; manual review required",
     "لم يتم التعرف على البند": "Clause not identified",
 }
 
 def english_details(item):
     name = item["name"]
     status = item["status"]
+    if status == "تم العثور على البند ويحتاج مراجعة":
+        return ("A related clause was found, but its wording or numbers have not been verified.",
+                "Check the original PDF manually before relying on these findings.")
     if status == "لم يتم التعرف على البند":
         return ("The extraction rules could not identify this clause in the available text. It may be worded differently or appear in an image.",
                 "Check the original contract manually; absence of an alert does not establish compliance.")
@@ -272,7 +230,7 @@ if uploaded_file is not None:
                           "Could not extract text from this PDF. It may be a scanned document."))
         else:
             st.success(tr("اكتملت محاولة استخراج النص", "Text extraction attempt completed"))
-            results = analyze_contract(text)
+            results = analyze_contract(text, scanned=bool(ocr_pages))
             if ocr_pages:
                 st.warning(tr(
                     "تنبيه: نتائج الصفحات المصورة غير مؤكدة بسبب احتمال أخطاء OCR في الأرقام وترتيب الكلمات. قارني كل نتيجة بالعقد الأصلي قبل الاعتماد عليها.",
@@ -307,6 +265,8 @@ if uploaded_file is not None:
                 with st.expander(name, expanded=False):
                     st.write("**" + tr("النص الأصلي:", "Original clause:") + "**")
                     clause = get_original_clause(text, item["name"])
+                    if ocr_pages and clause != "تعذر تحديد نص البند الأصلي.":
+                        clause = tr("مقتطف OCR غير مؤكد (راجعي صورة العقد):\n", "Unverified OCR excerpt (check PDF image):\n") + clause
                     if is_english and clause == "تعذر تحديد نص البند الأصلي.":
                         clause = "Original clause could not be identified."
                     st.write(clause)
