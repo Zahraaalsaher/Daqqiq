@@ -247,6 +247,68 @@ if uploaded_file is not None:
                         reference = reference.replace("المواد", "Articles").replace("المادة", "Article").replace(" و", " and ")
                     st.write("**" + tr("المرجع:", "Reference:") + "**", reference)
 
+            # Ask DAQQIQ: transparent, contract-grounded Q&A for supported clauses only.
+            st.markdown("---")
+            st.markdown("### " + tr("اسأل دقّق", "Ask DAQQIQ"))
+            st.write(tr(
+                "اسأل عن بند في العقد المرفوع: فترة التجربة، ساعات العمل، الإجازة السنوية أو الراتب والبدلات.",
+                "Ask about a clause in your uploaded contract: probation, working hours, annual leave, or salary and allowances."
+            ))
+            with st.form("ask_daqqiq_form"):
+                question = st.text_input(
+                    tr("سؤالك عن العقد", "Your question about the contract"),
+                    placeholder=tr("مثال: هل فترة التجربة في عقدي تحتاج مراجعة؟",
+                                   "Example: Does my probation clause need review?")
+                )
+                ask_submitted = st.form_submit_button(tr("اسأل دقّق", "Ask DAQQIQ"))
+
+            if ask_submitted:
+                q = question.strip().lower()
+                topic_keywords = {
+                    "فترة التجربة": ["تجرب", "اختبار", "probation", "trial period"],
+                    "ساعات العمل": ["ساع", "دوام", "عمل يوم", "working hour", "work hour", "hours per", "overtime"],
+                    "الإجازة السنوية": ["إجاز", "اجاز", "عطلة", "annual leave", "vacation", "holiday"],
+                    "الراتب والبدلات": ["راتب", "رواتب", "أجر", "اجر", "بدل", "salary", "wage", "allowance", "pay"],
+                }
+                topics = [name for name, keywords in topic_keywords.items()
+                          if any(keyword in q for keyword in keywords)]
+                if not q:
+                    st.warning(tr("اكتب سؤالك أولًا.", "Please enter a question."))
+                elif len(topics) > 1:
+                    st.info(tr("سؤالك يتناول أكثر من بند. اسأل عن بند واحد في كل مرة.",
+                               "Your question mentions multiple clauses. Please ask about one at a time."))
+                elif not topics:
+                    st.info(tr(
+                        "هذا السؤال خارج نطاق النسخة التجريبية. أقدر أشرح فقط البنود الأربعة المدعومة بعد تحليلها من العقد.",
+                        "This question is outside the beta scope. I can only explain the four supported clauses when identified in the contract."
+                    ))
+                else:
+                    topic = topics[0]
+                    matching = next((item for item in results if item["name"] == topic), None)
+                    if matching is None:
+                        st.warning(tr(
+                            "لم أتعرف على هذا البند في النص المستخرج من عقدك. هذا لا يعني أنه غير موجود أو سليم؛ راجعه يدويًا.",
+                            "This clause was not identified in the extracted contract text. It may still be present; please review it manually."
+                        ))
+                    else:
+                        shown_name = NAME_EN.get(topic, topic) if is_english else topic
+                        shown_status = STATUS_EN.get(matching["status"], matching["status"]) if is_english else matching["status"]
+                        explanation, recommendation = (english_details(matching) if is_english
+                                                       else (matching["explanation"], matching["recommendation"]))
+                        st.markdown("**" + shown_name + "**")
+                        st.write("**" + tr("نتيجة الفحص:", "Review status:") + "** " + shown_status)
+                        st.write("**" + tr("الشرح:", "Explanation:") + "** " + explanation)
+                        st.write("**" + tr("الخطوة المقترحة:", "Suggested next step:") + "** " + recommendation)
+                        reference = matching["reference"]
+                        if is_english:
+                            reference = reference.replace("المواد", "Articles").replace("المادة", "Article").replace(" و", " and ")
+                        st.caption(tr("مرجع مذكور للمراجعة (لم يتم التحقق من سريانه آليًا): ",
+                                      "Reference for manual verification (not automatically checked for currency): ") + reference)
+                        st.caption(tr(
+                            "الإجابة مبنية على قواعد الفحص وبيانات العقد المستخرجة، وليست محادثة ذكاء اصطناعي أو فتوى قانونية.",
+                            "This answer comes from rule-based analysis of extracted contract text, not an AI legal opinion."
+                        ))
+
             st.info(tr("هذا فحص أولي بقواعد محددة. عدم ظهور تنبيه لا يعني سلامة العقد، وقد توجد استثناءات نظامية.",
                        "This is a preliminary rule-based check. No alert does not mean the contract is legally compliant; exceptions may apply."))
     except Exception:
