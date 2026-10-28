@@ -57,8 +57,7 @@ def extract_pdf_with_ocr(pdf_bytes):
             recognized = ""
             try:
                 # PyMuPDF OCR calls Tesseract installed on the host system.
-               tp = page.get_textpage_ocr(language="ara", dpi=300, full=True) 
-
+                tp = page.get_textpage_ocr(language="ara", dpi=300, full=True)
                 recognized = page.get_text(textpage=tp, sort=False).strip()
             except Exception:
                 try:
@@ -272,8 +271,13 @@ if uploaded_file is not None:
             st.warning(tr("تعذر استخراج النص من ملف PDF. قد يكون الملف مصورًا.",
                           "Could not extract text from this PDF. It may be a scanned document."))
         else:
-            st.success(tr("تمت قراءة العقد بنجاح", "Contract text extracted successfully"))
+            st.success(tr("اكتملت محاولة استخراج النص", "Text extraction attempt completed"))
             results = analyze_contract(text)
+            if ocr_pages:
+                st.warning(tr(
+                    "تنبيه: نتائج الصفحات المصورة غير مؤكدة بسبب احتمال أخطاء OCR في الأرقام وترتيب الكلمات. قارني كل نتيجة بالعقد الأصلي قبل الاعتماد عليها.",
+                    "Warning: Scanned-page findings are unverified because OCR may misread numbers or word order. Check each finding against the original PDF."
+                ))
             safe_count = sum(item["status"].startswith("لم يُرصد") for item in results)
             issue_count = sum(item["status"] in ["تعارض محتمل", "معلومات ناقصة"] for item in results)
             missing_count = sum(item["status"] == "لم يتم التعرف على البند" for item in results)
@@ -332,8 +336,8 @@ if uploaded_file is not None:
             if len(text.strip()) < 200:
                 st.warning(tr("النص المستخرج قصير؛ ربما يحتوي الملف على صور أو جداول لم تُقرأ بدقة. لا تعتمد على النتيجة وحدها.",
                               "Very little text was extracted; scans or tables may not have been read correctly. Do not rely on this result alone."))
-            st.caption(tr("ملفات PDF المصورة تحتاج OCR؛ هذه النسخة لا تدّعي دعم OCR الكامل.",
-                          "Scanned PDFs require OCR; this version does not claim full OCR support."))
+            st.caption(tr("تدعم النسخة محاولة قراءة الصفحات المصورة باستخدام OCR، وقد تخطئ في الكلمات والأرقام العربية؛ تحققي من النص الأصلي.",
+                          "This beta attempts OCR on scanned pages. Arabic words and numbers may be misread; verify against the original."))
 
             report_lines = [tr("تقرير دقّق التجريبي", "DAQQIQ beta report"), tr("التاريخ: ", "Date: ") + str(date.today()),
                             tr("فحص أولي وليس رأيًا قانونيًا", "Preliminary screening, not legal advice"), ""]
