@@ -217,6 +217,15 @@ def get_original_clause(text, name):
     for i, line in enumerate(lines):
         norm = normalize_text(line)
         if any(re.search(pattern, norm, re.I) for pattern in HEADINGS[name]):
+            # Salary tables often occupy more than three lines. Preserve their
+            # rows until the next numbered clause, rather than truncating them.
+            if name == "الراتب والبدلات":
+                collected = [line]
+                for following in lines[i + 1:i + 24]:
+                    if re.match(r"^\s*(?:Clause\s+\d+\s*[-–—:]|البند\s+(?:الاول|الأول|الثاني|الثالث|الرابع|الخامس)\b)", following, re.I):
+                        break
+                    collected.append(following)
+                return "\n".join(collected).strip()[:1200]
             # OCR sometimes merges the next heading onto the same line.
             snippet = " ".join(lines[i:i + 3]).strip()
             next_headings = [
