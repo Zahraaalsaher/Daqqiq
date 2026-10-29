@@ -72,7 +72,17 @@ hr { border-color: #DFE7F0; }
     color: #102A43 !important;
     -webkit-text-fill-color: #102A43 !important;
 }
+/* Fix warning message contrast */
+[data-testid="stAlert"] {
+    color: #102A43 !important;
+}
 
+[data-testid="stAlert"] p,
+[data-testid="stAlert"] span,
+[data-testid="stAlert"] div {
+    color: #102A43 !important;
+    -webkit-text-fill-color: #102A43 !important;
+}
 </style>
 """, unsafe_allow_html=True)
 
