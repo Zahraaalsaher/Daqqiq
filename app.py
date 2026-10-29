@@ -36,6 +36,28 @@ p, label { line-height: 1.75; }
 a { color: #17618D; }
 hr { border-color: #DFE7F0; }
 @media (max-width: 640px) { .block-container { padding: 1rem .8rem 3rem; } [data-testid="stMetric"] { min-height: 90px; } }
+
+/* Improve language selector contrast */
+[data-testid="stRadio"] label,
+[data-testid="stRadio"] p,
+[data-testid="stRadio"] span {
+    color: #102A43 !important;
+}
+
+/* Improve PDF upload contrast */
+[data-testid="stFileUploader"] label,
+[data-testid="stFileUploader"] p,
+[data-testid="stFileUploader"] span,
+[data-testid="stFileUploaderDropzone"] button,
+[data-testid="stFileUploaderDropzone"] button * {
+    color: #102A43 !important;
+}
+
+[data-testid="stFileUploaderDropzone"] button {
+    background-color: #D8AC59 !important;
+    border: 1px solid #C89D4E !important;
+}
+
 </style>
 """, unsafe_allow_html=True)
 
