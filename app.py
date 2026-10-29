@@ -342,6 +342,25 @@ with st.expander(tr("المصادر النظامية ونطاق الاسترجا
         st.caption(source["en"] if is_english else source["ar"])
     st.markdown("[HRSD](https://www.hrsd.gov.sa/) · [Bureau of Experts](https://laws.boe.gov.sa/)")
 
+# Explain the difference between rule-based alerts and legal conclusions.
+with st.expander(tr("كيف يفسّر دقّق النتائج؟", "How DAQQIQ interprets findings")):
+    st.markdown(tr(
+        "**تعارض محتمل:** رصدت قاعدة الفحص رقمًا قد يتعارض مع حد معتاد؛ لا يعني ذلك إثبات مخالفة قانونية.\n\n"
+        "**يحتاج مراجعة:** البند موجود، لكن تفسيره يعتمد على شروط أخرى أو استثناءات أو مدة الخدمة.\n\n"
+        "**معلومات ناقصة أو غير مؤكدة:** لا تتوفر تفاصيل كافية، أو قد يكون OCR أخطأ في قراءة النص والأرقام.\n\n"
+        "**لم يُرصد تجاوز:** لم تكتشف القاعدة تجاوزًا في الجزء الذي استطاعت قراءته؛ هذا لا يعني أن العقد سليم قانونيًا.\n\n"
+        "**لم يتم التعرف على البند:** قد يكون البند بصياغة مختلفة أو داخل جدول أو صورة، وليس بالضرورة غائبًا.",
+        "**Potential conflict:** A rule detected a number that may exceed a usual threshold; this does not establish a legal violation.\n\n"
+        "**Needs review:** The clause may depend on additional terms, exceptions, or length of service.\n\n"
+        "**Missing or unverified information:** Details are insufficient, or OCR may have misread words and numbers.\n\n"
+        "**No limit exceeded:** No issue was detected by the applicable rule in the readable text; this does not establish legal compliance.\n\n"
+        "**Clause not identified:** The clause may use different wording or appear in a table or image; it is not necessarily absent."
+    ))
+    st.info(tr(
+        "يجب قراءة البند في سياق العقد الكامل والتحقق من النظام الساري والاستثناءات قبل اتخاذ قرار.",
+        "Read each clause in the context of the full contract and verify current law and exceptions before making a decision."
+    ))
+
 st.markdown("### " + tr("ابدأ مراجعة عقدك", "Start reviewing your contract"))
 st.write(tr("ارفع عقد العمل بصيغة PDF، وسنساعدك في فهم البنود التي تحتاج إلى مراجعة.",
             "Upload an employment contract as a PDF to review supported clauses."))
@@ -431,7 +450,7 @@ if uploaded_file is not None:
                     st.write("**" + tr("التوصية:", "Recommendation:") + "**", recommendation)
                     reference = item["reference"]
                     if is_english:
-                        reference = reference.replace("المواد", "Articles").replace("المادة", "Article").replace(" و", " and ")
+                        reference = "Articles 98–100" if item["name"] == "ساعات العمل" else reference.replace("المواد", "Articles").replace("المادة", "Article").replace(" و", " and ")
                     st.write("**" + tr("المرجع:", "Reference:") + "**", reference)
                     st.caption(tr("للتحقق يدويًا من النص النظامي وتحديثاته: ", "Manually check the legal text and updates: "))
                     st.markdown("[" + tr("وزارة الموارد البشرية والتنمية الاجتماعية", "Ministry of Human Resources") + "](https://www.hrsd.gov.sa/) · [" + tr("هيئة الخبراء بمجلس الوزراء", "Bureau of Experts") + "](https://laws.boe.gov.sa/)")
@@ -523,7 +542,7 @@ if uploaded_file is not None:
                         st.write("**" + tr("الخطوة المقترحة:", "Suggested next step:") + "** " + recommendation)
                         reference = matching["reference"]
                         if is_english:
-                            reference = reference.replace("المواد", "Articles").replace("المادة", "Article").replace(" و", " and ")
+                            reference = "Articles 98–100" if matching["name"] == "ساعات العمل" else reference.replace("المواد", "Articles").replace("المادة", "Article").replace(" و", " and ")
                         source = retrieve_reference(topic)
                         if source:
                             st.write("**" + tr("من المكتبة المرجعية المحلية:", "From the local reference index:") + "**")
