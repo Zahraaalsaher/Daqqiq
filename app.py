@@ -58,6 +58,21 @@ hr { border-color: #DFE7F0; }
     border: 1px solid #C89D4E !important;
 }
 
+/* Fix extracted text visibility */
+[data-testid="stTextArea"] textarea {
+    background-color: #FFFFFF !important;
+    color: #102A43 !important;
+    -webkit-text-fill-color: #102A43 !important;
+}
+
+[data-testid="stCodeBlock"],
+[data-testid="stCodeBlock"] pre,
+[data-testid="stCodeBlock"] code {
+    background-color: #FFFFFF !important;
+    color: #102A43 !important;
+    -webkit-text-fill-color: #102A43 !important;
+}
+
 </style>
 """, unsafe_allow_html=True)
 
