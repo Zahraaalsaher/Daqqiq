@@ -225,21 +225,55 @@ def get_original_clause(text, name):
 
 
 
-def improve_ocr_excerpt(excerpt):
-    """Improve display of clearly reversed Arabic OCR lines; never correct numeric values."""
-    lines = excerpt.splitlines()
-    corrected = []
-    changed = False
-    for line in lines:
-        # Only reverse lines containing distinctive backwards Arabic phrases.
-        # Avoid reversing ordinary headings, Latin text or mixed-direction lines.
-        if re.search(r"ةبرجت\s+ةرتفل|ةيونس\s+ةزاجا|يرهشلا\s+بتارلا", normalize_text(line)):
-            line = line[::-1]
-            # Reversing a line can reverse digit order; do not display guessed values.
-            line = re.sub(r"[0-9٠-٩۰-۹]+", "[رقم غير مؤكد]", line)
-            changed = True
-        corrected.append(line)
-    return "\n".join(corrected), changed
+def improve_ocr_excerpt(excerpt, topic=None):
+    """Tentative display cleanup for known reversed OCR clauses, not legal extraction.
+
+    Never infer numbers or rewrite the raw OCR evidence.
+    """
+    # The OCR engine can put a *normal* heading before reversed body text.
+    # Remove only a recognized heading from the tentative display, not the raw text.
+    heading = re.compile(
+        r"^\s*البند\s+(?:الاول|الثاني|الثانى|الثالث|الرابع|الخامس)"
+        r"\s*[:：-]?\s*(?:فترة\s*التجرب[هة]?|ساعات\s*العمل|"
+        r"الاجازة\s*السنوي[هة]?|الراتب\s*والبدلات)\s*",
+        re.I,
+    )
+    cleaned = heading.sub("", normalize_text(excerpt), count=1).strip()
+    # Keep the original letters (including hamza) for display where possible.
+    original_cleaned = re.sub(
+        r"^\s*البند\s+(?:الأول|الاول|الثاني|الثانى|الثالث|الرابع|الخامس)"
+        r"\s*[:：-]?\s*(?:فترة\s*التجرب[هة]?|ساعات\s*العمل|"
+        r"الإجازة\s*السنوي[هة]?|الاجازة\s*السنوي[هة]?|الراتب\s*والبدلات)\s*",
+        "", excerpt, count=1, flags=re.I,
+    ).strip()
+
+    # Some PDF OCR outputs mix right-to-left and left-to-right runs.
+    # Reconstruct only lines with distinctive backwards phrases; otherwise
+    # leave them alone rather than pretending we corrected the OCR.
+    if re.search(r"ةبرجت\s+ةرتفل", cleaned):
+        tentative = original_cleaned[::-1]
+    elif re.search(r"ةعوفدم\s+ةيونس\s+ةزاج", cleaned):
+        tentative = original_cleaned[::-1]
+    elif re.search(r"يرهشلا\s+بتارلا", cleaned):
+        # Mixed-direction salary OCR is unreliable. Preserve only the
+        # recognizable phrase and do not claim to reconstruct the full line.
+        tentative = "إجمالي الراتب الشهري: [رقم غير مؤكد]"
+    else:
+        return excerpt, False
+
+    # Remove heading debris that appears after reversing a merged OCR line.
+    tentative = re.sub(
+        r"\s*(?:ةيونسلا\s+ةزاجإلا|ةيونسلا\s+ةزاجالا)\s*[:：]?\s*"
+        r"(?:ثلاثلا\s+دنبلا)?\s*$", "", tentative
+    )
+    # Numeric OCR in a scan is not trustworthy, including reversed digits.
+    tentative = re.sub(r"[0-9٠-٩۰-۹]+", "[رقم غير مؤكد]", tentative)
+    tentative = re.sub(r"[\"“”'«»]+(?=\s*\[رقم غير مؤكد\])", "", tentative)
+    tentative = re.sub(r"يومً\s+ا", "يومًا", tentative)
+    tentative = re.sub(r"\s+", " ", tentative).strip(" .")
+    if not tentative:
+        return excerpt, False
+    return tentative + ".", True
 
 
 NAME_EN = {
@@ -360,7 +394,7 @@ if uploaded_file is not None:
                     st.write("**" + tr("النص الأصلي:", "Original clause:") + "**")
                     clause = get_original_clause(text, item["name"])
                     if ocr_pages and clause != "تعذر تحديد نص البند الأصلي.":
-                        improved, was_reversed = improve_ocr_excerpt(clause)
+                        improved, was_reversed = improve_ocr_excerpt(clause, item["name"])
                         if was_reversed:
                             st.caption(tr(
                                 "قراءة مبدئية لترتيب الكلمات (الأرقام غير مؤكدة؛ قارنيها بالصورة):",
