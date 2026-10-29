@@ -135,7 +135,7 @@ TOPIC_SOURCE_URLS = {
     "الإجازة السنوية": "https://www.hrsd.gov.sa/en/شروط-العمل-وظروفه",
     "الراتب والبدلات": "https://www.hrsd.gov.sa/علاقات-العمل",
 }
-OFFICIAL_LAW_URL = "https://www.hrsd.gov.sa/knowledge-centre/decisions-and-regulations/regulation-and-procedures/نظام-العمل"
+OFFICIAL_LAW_URL = "https://www.hrsd.gov.sa/sites/default/files/2025-05/hrsd.pdf"
 
 OFFICIAL_SOURCES = {
     "HRSD": "https://www.hrsd.gov.sa/",
@@ -350,7 +350,9 @@ with st.expander(tr("المصادر النظامية ونطاق الاسترجا
         label = NAME_EN.get(topic, topic) if is_english else topic
         st.write("**" + label + " — " + tr("المادة/المواد: ", "Article(s): ") + source["articles"] + "**")
         st.caption(source["en"] if is_english else source["ar"])
-    st.markdown("[HRSD](https://www.hrsd.gov.sa/) · [Bureau of Experts](https://laws.boe.gov.sa/)")
+        st.markdown("[" + tr("القسم الرسمي المرتبط بالبند", "Official section for this topic") + "](" + TOPIC_SOURCE_URLS[topic] + ")")
+    st.markdown("[" + tr("نظام العمل — المصدر الرسمي", "Labor Law — official source") + "](" + OFFICIAL_LAW_URL + ")")
+    st.caption(tr("الروابط للمراجعة اليدوية، وليست تحققًا آليًا من سريان النصوص.", "Links are for manual review, not automatic verification of legal currency."))
 
 # Explain the difference between rule-based alerts and legal conclusions.
 with st.expander(tr("كيف يفسّر دقّق النتائج؟", "How DAQQIQ interprets findings")):
@@ -463,7 +465,7 @@ if uploaded_file is not None:
                         reference = "Articles 98–100" if item["name"] == "ساعات العمل" else reference.replace("المواد", "Articles").replace("المادة", "Article").replace(" و", " and ")
                     st.write("**" + tr("المرجع:", "Reference:") + "**", reference)
                     st.caption(tr("للتحقق يدويًا من النص النظامي وتحديثاته: ", "Manually check the legal text and updates: "))
-                    st.markdown("[" + tr("صفحة المادة لدى وزارة الموارد البشرية", "Relevant HRSD legal section") + "](" + TOPIC_SOURCE_URLS[item["name"]] + ") · [" + tr("نظام العمل وتعديلاته", "Labor Law and amendments") + "](" + OFFICIAL_LAW_URL + ")")
+                    st.markdown("[" + tr("القسم الرسمي المرتبط بالموضوع", "Relevant HRSD legal section") + "](" + TOPIC_SOURCE_URLS[item["name"]] + ") · [" + tr("نظام العمل وتعديلاته", "Labor Law and amendments") + "](" + OFFICIAL_LAW_URL + ")")
                     st.caption(tr("رابط رسمي للمراجعة اليدوية فقط؛ لم يتحقق دقّق آليًا من سريان النص أو انطباق الاستثناءات.", "Official source for manual verification only; DAQQIQ has not automatically checked current applicability or exceptions."))
 
             st.caption(tr("التصنيف يصف ما رصدته قواعد الفحص فقط؛ لا يثبت صحة العقد أو مخالفته.",
