@@ -224,6 +224,24 @@ def get_original_clause(text, name):
     return "تعذر تحديد نص البند الأصلي."
 
 
+
+def improve_ocr_excerpt(excerpt):
+    """Improve display of clearly reversed Arabic OCR lines; never correct numeric values."""
+    lines = excerpt.splitlines()
+    corrected = []
+    changed = False
+    for line in lines:
+        # Only reverse lines containing distinctive backwards Arabic phrases.
+        # Avoid reversing ordinary headings, Latin text or mixed-direction lines.
+        if re.search(r"ةبرجت\s+ةرتفل|ةيونس\s+ةزاجا|يرهشلا\s+بتارلا", normalize_text(line)):
+            line = line[::-1]
+            # Reversing a line can reverse digit order; do not display guessed values.
+            line = re.sub(r"[0-9٠-٩۰-۹]+", "[رقم غير مؤكد]", line)
+            changed = True
+        corrected.append(line)
+    return "\n".join(corrected), changed
+
+
 NAME_EN = {
     "فترة التجربة": "Probation period",
     "ساعات العمل": "Working hours",
@@ -342,7 +360,14 @@ if uploaded_file is not None:
                     st.write("**" + tr("النص الأصلي:", "Original clause:") + "**")
                     clause = get_original_clause(text, item["name"])
                     if ocr_pages and clause != "تعذر تحديد نص البند الأصلي.":
-                        clause = tr("مقتطف OCR غير مؤكد (راجعي صورة العقد):\n", "Unverified OCR excerpt (check PDF image):\n") + clause
+                        improved, was_reversed = improve_ocr_excerpt(clause)
+                        if was_reversed:
+                            st.caption(tr(
+                                "قراءة مبدئية لترتيب الكلمات (الأرقام غير مؤكدة؛ قارنيها بالصورة):",
+                                "Tentative word-order correction (numbers unverified; compare with image):"
+                            ))
+                            st.write(improved)
+                        clause = tr("مقتطف OCR الخام غير مؤكد (راجعي صورة العقد):\n", "Unverified raw OCR excerpt (check PDF image):\n") + clause
                     if is_english and clause == "تعذر تحديد نص البند الأصلي.":
                         clause = "Original clause could not be identified."
                     st.write(clause)
