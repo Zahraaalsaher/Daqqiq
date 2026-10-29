@@ -188,6 +188,17 @@ def analyze_contract(text, scanned=False):
                         status = "تحتاج مراجعة" if daily > 8 or weekly > 48 else "لم يُرصد تجاوز للحد المعتاد"
                         explanation = f"العقد يذكر {daily} ساعات يوميًا و{weekly} ساعة أسبوعيًا؛ قد تنطبق استثناءات."
                         recommendation = "تحققي من نوع العمل والاستثناءات والأنظمة السارية."
+                elif re.search(
+                    r"according to (?:the )?company needs|operational requirements|"
+                    r"no fixed (?:daily|weekly|working) hours|hours (?:will be|are) determined|"
+                    r"حسب (?:حاجة|احتياج|متطلبات) (?:الشركة|العمل)|"
+                    r"وفقا (?:لحاجة|لاحتياج|لمتطلبات) (?:الشركة|العمل)|"
+                    r"دون تحديد (?:عدد )?ساعات|ساعات العمل (?:تحدد|تُحدد) لاحقا",
+                    normalized, re.I
+                ):
+                    status = "معلومات ناقصة"
+                    explanation = "يربط العقد ساعات العمل باحتياجات الشركة أو لا يحدد عدد الساعات اليومية والأسبوعية بوضوح؛ لا يمكن تقييم الحدود من هذا النص وحده."
+                    recommendation = "اطلبي توضيح ساعات العمل المتفق عليها كتابةً، وراجعي الاستثناءات النظامية إن وجدت."
             elif name == "الإجازة السنوية":
                 m = re.search(r"(?:annual leave(?: of| is|:)?|اجازة سنوية(?: مدتها|:)?|الاجازة السنوية(?: مدتها|:)?)[\s\S]{0,24}?(\d{1,3})\s*(?:days?|يوم)|(\d{1,3})\s*days of paid annual leave", normalized, re.I)
                 if m:
@@ -337,6 +348,9 @@ def english_details(item):
         return (f"The probation period is {days} days. " + ("This exceeds 180 days." if issue else "This does not exceed 180 days."),
                 "Request a revision of the probation period before signing." if issue else "Check the remaining probation terms.")
     if name == "ساعات العمل":
+        if status == "معلومات ناقصة":
+            return ("Working hours depend on company needs or are not clearly specified as daily and weekly hours; the limits cannot be assessed from this wording alone.",
+                    "Ask for the agreed working hours in writing and check any applicable legal exceptions.")
         daily, weekly = (numbers + ["?", "?"])[:2]
         return (f"The contract states {daily} hours per day and {weekly} hours per week. Legal exceptions may apply.",
                 "Check the type of work and any applicable exceptions.")
