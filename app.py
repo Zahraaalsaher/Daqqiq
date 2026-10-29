@@ -127,6 +127,16 @@ SOURCE_INDEX = {
         "en": "Check the written wage and allowance terms against current contract requirements.",
     },
 }
+# Verified official topic-specific entry points (checked 2026-10-29).
+# These are manual source links, not automatically retrieved or validated law.
+TOPIC_SOURCE_URLS = {
+    "فترة التجربة": "https://www.hrsd.gov.sa/علاقات-العمل",
+    "ساعات العمل": "https://www.hrsd.gov.sa/en/شروط-العمل-وظروفه",
+    "الإجازة السنوية": "https://www.hrsd.gov.sa/en/شروط-العمل-وظروفه",
+    "الراتب والبدلات": "https://www.hrsd.gov.sa/علاقات-العمل",
+}
+OFFICIAL_LAW_URL = "https://www.hrsd.gov.sa/knowledge-centre/decisions-and-regulations/regulation-and-procedures/نظام-العمل"
+
 OFFICIAL_SOURCES = {
     "HRSD": "https://www.hrsd.gov.sa/",
     "Bureau of Experts": "https://laws.boe.gov.sa/",
@@ -453,7 +463,8 @@ if uploaded_file is not None:
                         reference = "Articles 98–100" if item["name"] == "ساعات العمل" else reference.replace("المواد", "Articles").replace("المادة", "Article").replace(" و", " and ")
                     st.write("**" + tr("المرجع:", "Reference:") + "**", reference)
                     st.caption(tr("للتحقق يدويًا من النص النظامي وتحديثاته: ", "Manually check the legal text and updates: "))
-                    st.markdown("[" + tr("وزارة الموارد البشرية والتنمية الاجتماعية", "Ministry of Human Resources") + "](https://www.hrsd.gov.sa/) · [" + tr("هيئة الخبراء بمجلس الوزراء", "Bureau of Experts") + "](https://laws.boe.gov.sa/)")
+                    st.markdown("[" + tr("صفحة المادة لدى وزارة الموارد البشرية", "Relevant HRSD legal section") + "](" + TOPIC_SOURCE_URLS[item["name"]] + ") · [" + tr("نظام العمل وتعديلاته", "Labor Law and amendments") + "](" + OFFICIAL_LAW_URL + ")")
+                    st.caption(tr("رابط رسمي للمراجعة اليدوية فقط؛ لم يتحقق دقّق آليًا من سريان النص أو انطباق الاستثناءات.", "Official source for manual verification only; DAQQIQ has not automatically checked current applicability or exceptions."))
 
             st.caption(tr("التصنيف يصف ما رصدته قواعد الفحص فقط؛ لا يثبت صحة العقد أو مخالفته.",
                           "Statuses describe rule-based findings only; they do not establish legal compliance or violation."))
@@ -548,7 +559,7 @@ if uploaded_file is not None:
                             st.write("**" + tr("من المكتبة المرجعية المحلية:", "From the local reference index:") + "**")
                             st.write(source["en"] if is_english else source["ar"])
                             st.caption(tr("رقم المادة للمراجعة: ", "Article pointer: ") + source["articles"])
-                            st.markdown("[HRSD](https://www.hrsd.gov.sa/) · [Bureau of Experts](https://laws.boe.gov.sa/)")
+                            st.markdown("[" + tr("القسم النظامي الرسمي", "Official legal section") + "](" + TOPIC_SOURCE_URLS[topic] + ") · [" + tr("نظام العمل", "Labor Law") + "](" + OFFICIAL_LAW_URL + ")")
                         st.caption(tr("مرجع مذكور للمراجعة (لم يتم التحقق من سريانه آليًا): ",
                                       "Reference for manual verification (not automatically checked for currency): ") + reference)
                         st.caption(tr(
