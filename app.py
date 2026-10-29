@@ -247,6 +247,13 @@ def improve_ocr_excerpt(excerpt, topic=None):
         "", excerpt, count=1, flags=re.I,
     ).strip()
 
+    # Working-hours OCR: display a conservative readable paraphrase only when
+    # the recognized text contains the expected working-hours wording.
+    # Both quantities remain unverified, including letter-like OCR digits.
+    if topic == "ساعات العمل" and re.search(r"ساعات\s*العمل|ساعات\s*يومي", normalize_text(excerpt)) and re.search(r"الاسبوع|الأسبوع", excerpt):
+        return ("تكون ساعات العمل الفعلية [رقم غير مؤكد] ساعات يوميًا، "
+                "لمدة [رقم غير مؤكد] أيام في الأسبوع."), True
+
     # Some PDF OCR outputs mix right-to-left and left-to-right runs.
     # Reconstruct only lines with distinctive backwards phrases; otherwise
     # leave them alone rather than pretending we corrected the OCR.
