@@ -257,7 +257,8 @@ def improve_ocr_excerpt(excerpt, topic=None):
     elif re.search(r"يرهشلا\s+بتارلا", cleaned):
         # Mixed-direction salary OCR is unreliable. Preserve only the
         # recognizable phrase and do not claim to reconstruct the full line.
-        tentative = "إجمالي الراتب الشهري: [رقم غير مؤكد]"
+        currency = " ريال سعودي" if re.search(r"ريال\s+سعودي", excerpt) else ""
+        tentative = "إجمالي الراتب الشهري: [رقم غير مؤكد]" + currency
     else:
         return excerpt, False
 
@@ -391,20 +392,28 @@ if uploaded_file is not None:
                 status = STATUS_EN.get(item["status"], item["status"]) if is_english else item["status"]
                 explanation, recommendation = english_details(item) if is_english else (item["explanation"], item["recommendation"])
                 with st.expander(name, expanded=False):
-                    st.write("**" + tr("النص الأصلي:", "Original clause:") + "**")
+                    st.write("**" + tr("النص المستخرج من العقد:", "Extracted contract text:") + "**")
                     clause = get_original_clause(text, item["name"])
                     if ocr_pages and clause != "تعذر تحديد نص البند الأصلي.":
                         improved, was_reversed = improve_ocr_excerpt(clause, item["name"])
                         if was_reversed:
                             st.caption(tr(
-                                "قراءة مبدئية لترتيب الكلمات (الأرقام غير مؤكدة؛ قارنيها بالصورة):",
-                                "Tentative word-order correction (numbers unverified; compare with image):"
+                                "قراءة مبدئية لتحسين ترتيب الكلمات؛ الأرقام غير مؤكدة ويجب مراجعة صورة العقد:",
+                                "Tentative OCR word-order correction; numbers are unverified. Check the original PDF:"
                             ))
                             st.write(improved)
-                        clause = tr("مقتطف OCR الخام غير مؤكد (راجعي صورة العقد):\n", "Unverified raw OCR excerpt (check PDF image):\n") + clause
-                    if is_english and clause == "تعذر تحديد نص البند الأصلي.":
-                        clause = "Original clause could not be identified."
-                    st.write(clause)
+                        else:
+                            st.caption(tr(
+                                "نص مستخرج آليًا وغير مؤكد؛ قارنيه بصورة العقد:",
+                                "Unverified OCR text; compare with the original PDF:"
+                            ))
+                            st.write(clause)
+                        with st.expander(tr("عرض نص OCR الخام", "Show raw OCR text"), expanded=False):
+                            st.code(clause, language=None)
+                    else:
+                        if is_english and clause == "تعذر تحديد نص البند الأصلي.":
+                            clause = "Original clause could not be identified."
+                        st.write(clause)
                     if item["status"].startswith("لم يُرصد"):
                         st.success(tr("الحالة: ", "Status: ") + status)
                     elif item["status"] in ["تعارض محتمل", "معلومات ناقصة"]:
