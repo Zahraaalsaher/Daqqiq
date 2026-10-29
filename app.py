@@ -15,19 +15,39 @@ def tr(ar, en):
 
 st.markdown("""
 <style>
-.stApp {background-color: #F7F9FC; color: #102A43;}
-h1, h2, h3 {color: #102A43 !important;}
-.stButton > button {background-color: #E7BE70; color: #102A43; border-radius: 10px; border: none;}
+/* DAQQIQ visual refresh — presentation only; no screening rules changed. */
+.stApp { background: linear-gradient(180deg, #EEF3F8 0%, #F7F9FC 320px, #F7F9FC 100%); color: #102A43; }
+.block-container { max-width: 1080px; padding-top: 2rem; padding-bottom: 4rem; }
+h1, h2, h3 { color: #102A43 !important; letter-spacing: -.025em; }
+h3 { padding-top: .8rem; }
+p, label { line-height: 1.75; }
+[data-testid="stRadio"] { background: #FFFFFF; border: 1px solid #E2E9F0; border-radius: 14px; padding: .6rem 1rem; box-shadow: 0 2px 12px rgba(16,42,67,.035); }
+[data-testid="stExpander"] { background: #FFFFFF; border: 1px solid #DFE7F0 !important; border-radius: 14px !important; box-shadow: 0 3px 16px rgba(16,42,67,.045); overflow: hidden; margin-bottom: .55rem; }
+[data-testid="stExpander"] summary { font-weight: 650; color: #102A43; padding: .35rem .4rem; }
+[data-testid="stMetric"] { background: #FFFFFF; border: 1px solid #E0E8F1; border-top: 3px solid #D6AD62; border-radius: 13px; padding: 14px 15px; box-shadow: 0 3px 14px rgba(16,42,67,.05); min-height: 112px; }
+[data-testid="stMetricLabel"] { color: #536779; }
+[data-testid="stMetricValue"] { color: #102A43; }
+[data-testid="stFileUploader"] { background: #FFFFFF; border: 1px solid #DFE7F0; border-radius: 16px; padding: 12px 18px; box-shadow: 0 4px 18px rgba(16,42,67,.04); }
+[data-testid="stFileUploaderDropzone"] { background: #F8FAFD; border: 1.5px dashed #B9C8D9; border-radius: 12px; }
+.stButton > button, [data-testid="stDownloadButton"] button, [data-testid="stFormSubmitButton"] button { background: #D8AC59; color: #102A43; border: 1px solid #C89D4E; border-radius: 10px; font-weight: 700; padding: .55rem 1.25rem; transition: background .2s ease; }
+.stButton > button:hover, [data-testid="stDownloadButton"] button:hover, [data-testid="stFormSubmitButton"] button:hover { background: #E8C37D; color: #102A43; border-color: #D8AC59; }
+[data-testid="stAlert"] { border-radius: 12px; }
+[data-testid="stForm"] { background: #FFFFFF; border: 1px solid #DFE7F0; border-radius: 15px; padding: 1rem; }
+a { color: #17618D; }
+hr { border-color: #DFE7F0; }
+@media (max-width: 640px) { .block-container { padding: 1rem .8rem 3rem; } [data-testid="stMetric"] { min-height: 90px; } }
 </style>
 """, unsafe_allow_html=True)
 
 main_title = tr("افهم عقد عملك قبل التوقيع", "Understand your employment contract before signing")
 main_description = tr("مساعد لمراجعة بنود عقود العمل السعودية", "An assistant for reviewing Saudi employment contract clauses")
 header_html = """
-<div style="background-color:#102A43; padding:35px; border-radius:16px; text-align:center;">
-  <div style="color:#E7BE70; font-size:48px; font-weight:bold; padding:10px 0;">دقّق | DAQQIQ</div>
-  <p style="color:white; font-size:20px;">__TITLE__</p>
-  <p style="color:#DDE6EE; font-size:15px;">__DESCRIPTION__</p>
+<div style="background:linear-gradient(125deg,#0D243A 0%,#143A58 100%);padding:44px 24px 40px;border-radius:20px;text-align:center;box-shadow:0 12px 32px rgba(16,42,67,.16);border:1px solid #24455E;position:relative;overflow:hidden;">
+  <div style="width:76px;height:4px;background:#D8AC59;border-radius:4px;margin:0 auto 20px;"></div>
+  <div style="color:#E9C782;font-size:clamp(34px,5vw,52px);font-weight:800;letter-spacing:.02em;line-height:1.3;">دقّق <span style="color:#A9B7C5;font-weight:300;">|</span> DAQQIQ</div>
+  <p style="color:#FFFFFF;font-size:clamp(17px,2.3vw,22px);font-weight:650;margin:16px 0 6px;">__TITLE__</p>
+  <p style="color:#D0DCE7;font-size:15px;margin:0;">__DESCRIPTION__</p>
+  <div style="width:100px;height:1px;background:rgba(216,172,89,.55);margin:22px auto 0;"></div>
 </div>
 """
 st.markdown(header_html.replace("__TITLE__", escape(main_title)).replace("__DESCRIPTION__", escape(main_description)), unsafe_allow_html=True)
@@ -439,8 +459,8 @@ if uploaded_file is not None:
 
             report_heading = tr("تقرير مراجعة العقد", "Contract review report")
             report_html = """
-<div style="background-color:#102A43; padding:16px; border-radius:10px; text-align:center; margin-top:20px;">
-  <div style="color:#E7BE70; font-size:28px; font-weight:bold;">__REPORT__</div>
+<div style="background:linear-gradient(110deg,#102A43,#1B4463); padding:20px; border-radius:14px; text-align:center; margin-top:24px; border-bottom:3px solid #D8AC59;">
+  <div style="color:#E9C782; font-size:27px; font-weight:bold;">__REPORT__</div>
 </div>
 """
             st.markdown(report_html.replace("__REPORT__", escape(report_heading)), unsafe_allow_html=True)
