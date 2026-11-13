@@ -5,7 +5,9 @@ import io
 from datetime import date
 from html import escape
 
-st.set_page_config(page_title="دقّق | DAQQIQ - Beta")
+
+st.set_page_config(page_title="دقّق | DAQQIQ - Beta", page_icon="daqqiq_favicon.ico")
+  
 
 language = st.radio("Language / اللغة", ["العربية", "English"], horizontal=True)
 is_english = language == "English"
