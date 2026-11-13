@@ -6,10 +6,9 @@ from datetime import date
 from html import escape
 from PIL import Image
 
-favicon = Image.open("daqqiq_favicon.png")
 st.set_page_config(
     page_title="دقّق | DAQQIQ - Beta",
-    page_icon=favicon
+    page_icon="daqqiq_favicon.png"
 )
   
 
