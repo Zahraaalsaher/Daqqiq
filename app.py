@@ -4,9 +4,13 @@ import re
 import io
 from datetime import date
 from html import escape
+from PIL import Image
 
-
-st.set_page_config(page_title="دقّق | DAQQIQ - Beta", page_icon="daqqiq_favicon.ico")
+favicon = Image.open("daqqiq_favicon.ico")
+st.set_page_config(
+    page_title="دقّق | DAQQIQ - Beta",
+    page_icon=favicon
+)
   
 
 language = st.radio("Language / اللغة", ["العربية", "English"], horizontal=True)
